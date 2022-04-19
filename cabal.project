@@ -1,2 +1,16 @@
-index-state: 2022-03-03T00:00:00Z
-packages: .
+index-state: 2022-03-14T00:00:00Z
+packages:
+  .
+
+package eventuo11y
+  ghc-options: -Wall
+
+allow-newer:
+  servant:base,
+  servant:base-compat,
+  servant-client:base,
+  servant-client:base-compat,
+  servant-client:time,
+  servant-client-core:base,
+  servant-client-core:base-compat,
+  servant-client-core:template-haskell,
