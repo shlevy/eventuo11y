@@ -2,7 +2,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE ViewPatterns #-}
 module Observe.Event.Wai where
 
 import Control.Concurrent.Async
@@ -17,8 +16,7 @@ import Network.HTTP.Types.Version
 import Network.Socket
 import Network.Wai
 import Network.Wai.Internal
-import System.IO.Error
-import GHC.IO.Exception
+import Network.Wai.Handler.Warp
 import Data.Void
 
 import Observe.Event
@@ -103,7 +101,6 @@ renderOnExceptionField renderEx (OnExceptionField mreq e) =
   )
 
 eventfulOnException :: IO (Event IO r OnExceptionField) -> Maybe Request -> SomeException -> IO ()
-eventfulOnException _ Nothing e
-  | Just (ioeGetErrorType -> et) <- fromException e
-  , et == ResourceVanished || et == InvalidArgument = pure ()
-eventfulOnException mkE req e = withEvent mkE \ev -> addField ev $ OnExceptionField req e
+eventfulOnException mkE req e = if defaultShouldDisplayException e
+  then withEvent mkE \ev -> addField ev $ OnExceptionField req e
+  else pure ()

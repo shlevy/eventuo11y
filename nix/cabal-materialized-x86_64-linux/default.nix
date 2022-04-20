@@ -13,9 +13,11 @@
         "regex-posix".flags._regex-posix-clib = false;
         "network-uri".revision = (((hackage."network-uri")."2.6.4.1").revisions).default;
         "text".revision = (((hackage."text")."1.2.5.0").revisions).default;
-        "ed25519".revision = (((hackage."ed25519")."0.0.2.0").revisions).default;
+        "ed25519".revision = (((hackage."ed25519")."0.0.5.0").revisions).default;
         "ed25519".flags.test-hlint = true;
         "ed25519".flags.test-properties = true;
+        "ed25519".flags.no-donna = true;
+        "ed25519".flags.test-doctests = true;
         "array".revision = (((hackage."array")."0.5.4.0").revisions).default;
         "base64-bytestring".revision = (((hackage."base64-bytestring")."1.2.1.0").revisions).default;
         "network".revision = (((hackage."network")."3.1.2.7").revisions).default;
