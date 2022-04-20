@@ -16,6 +16,7 @@ import Data.CaseInsensitive
 import Data.Coerce
 import Data.Binary.Builder
 import Data.ByteString.Lazy hiding (null)
+import Data.ByteString.Lazy.Internal (ByteString(..))
 import Data.Foldable
 import Data.Functor.Alt
 import Data.Text.Encoding
@@ -40,13 +41,19 @@ data RunRequestField
   = ReqField Request
   | ResField Response
 
-responseJSON :: Response -> Value
-responseJSON Response {..} = Object
+responseJSON :: Response -> Bool -> Value
+responseJSON Response {..} forceBody = Object
   ( "status" .= statusCode responseStatusCode
  <> (if null responseHeaders
       then mempty
       else "headers" .= fmap (\(nm, val) -> Object ("name" .= decodeUtf8 (original nm) <> (if nm == "Cookie" then mempty else "val" .= decodeUtf8 val))) responseHeaders)
  <> "http-version" .= Object ("major" .= httpMajor responseHttpVersion <> "minor" .= httpMinor responseHttpVersion)
+ <> (if forceBody
+      then "body" .= (decodeUtf8 $ toStrict responseBody)
+      else case responseBody of
+        Empty -> "body" .= False
+        Chunk bs Empty -> "body" .= decodeUtf8 bs
+        _ -> mempty)
   )
 
 runRequestFieldJSON :: RenderFieldJSON RunRequestField
@@ -67,6 +74,8 @@ runRequestFieldJSON (ReqField Request {..}) =
             ( "content-type" .= decodeUtf8 (renderHeader ty)
            <> case body of
                 RequestBodyBS bs -> "body" .= decodeUtf8 bs
+                RequestBodyLBS Empty -> "body" .= False
+                RequestBodyLBS (Chunk bs Empty) -> "body" .= decodeUtf8 bs
                 _ -> mempty
             )
      <> (if null requestAccept
@@ -81,20 +90,20 @@ runRequestFieldJSON (ReqField Request {..}) =
   )
 runRequestFieldJSON (ResField res) =
   ( "response"
-  , responseJSON res
+  , responseJSON res False
   )
 
 clientErrorJSON :: RenderFieldJSON ClientError
-clientErrorJSON (FailureResponse _ res) = ("failure-response", responseJSON res)
-clientErrorJSON (DecodeFailure err res) = ("decode-failure", Object ("response" .= responseJSON res <> "err" .= String err))
+clientErrorJSON (FailureResponse _ res) = ("failure-response", responseJSON res True)
+clientErrorJSON (DecodeFailure err res) = ("decode-failure", Object ("response" .= responseJSON res True <> "err" .= String err))
 clientErrorJSON (UnsupportedContentType ty res) =
   ("unsupported-content-type", Object
-    ( "response" .= responseJSON res
+    ( "response" .= responseJSON res True
    <> "main-type" .= decodeUtf8 (original $ mainType ty)
    <> "sub-type" .=  decodeUtf8 (original $ subType ty)
    <> "parameters" .=  fmap (decodeUtf8 . original) (mapKeys (decodeUtf8 . original) $ parameters ty)
     ))
-clientErrorJSON (InvalidContentTypeHeader res) = ("invalid-content-type-header", responseJSON res)
+clientErrorJSON (InvalidContentTypeHeader res) = ("invalid-content-type-header", responseJSON res True)
 clientErrorJSON (ConnectionError e) = ("connection-error", toJSON $ show e)
 
 data EventfulClientState r = MkEventfulClientState
