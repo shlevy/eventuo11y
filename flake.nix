@@ -18,20 +18,18 @@
 
     tools = {
       cabal = {
-        version = "3.6.2.0";
         inherit (project) index-state;
         materialized = ifExists (./nix + "/cabal-materialized-${system}");
       };
 
       hoogle = {
-        version = "5.0.18.3";
         inherit (project) index-state;
         materialized = ifExists (./nix + "/hoogle-materialized-${system}");
       };
     };
     project = pkgs.haskell-nix.cabalProject' {
       src = ./.;
-      compiler-nix-name = "ghc922";
+      compiler-nix-name = "ghc924";
       shell.tools = tools;
       materialized = ifExists (./nix + "/materialized-${system}");
     };

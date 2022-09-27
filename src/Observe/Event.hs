@@ -2,107 +2,206 @@
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE BlockArguments #-}
-module Observe.Event where
+{-# LANGUAGE ApplicativeDo #-}
+{-# LANGUAGE LambdaCase #-}
+module Observe.Event
+  ( EventBackend
 
-import Control.Applicative
+  , Event
+  , reference
+  , addField
+  , addParent
+  , addProximate
+  , finalize
+  , failEvent
+
+  , newEvent
+  , newSubEvent
+
+  , withEvent
+  , withSubEvent
+
+  , acquireEvent
+  , acquireSubEvent
+
+  , subEventBackend
+  , unitEventBackend
+  , pairEventBackend
+  , hoistEventBackend
+  , narrowEventBackend'
+  , narrowEventBackend
+  ) where
+
 import Control.Exception
 import Control.Monad.Catch
+import Control.Monad.IO.Unlift
+import Data.Acquire
+import Data.Functor
 
-newtype EventBackend m r s = MkEventBackend
-  { newEvent :: forall f . s f -> m (Event m r f)
+import Observe.Event.Implementation
+
+data Event m r s f = Event
+  { backend :: !(EventBackend m r s)
+  , impl :: !(EventImpl m r f)
+  , finishFlag :: !(OnceFlag m)
   }
 
-data Event m r f = MkEvent
-  { ref :: !r
-  , addField :: !(f -> m ())
-  , addReference :: !(Reference r -> m ())
-  , finalize :: !(m ())
-  , failEvent :: !(Maybe SomeException -> m ())
-  }
+reference :: Event m r s f -> r
+reference (Event {..}) = referenceImpl impl
 
-data Reference r = MkReference
-  { referenceType :: !ReferenceType
-  , otherRef :: !r
-  }
+addField :: Event m r s f -> f -> m ()
+addField (Event {..}) = addFieldImpl impl
 
-addParent :: Event m r f -> r -> m ()
-addParent e = addReference e . MkReference Parent
+addParent :: Event m r s f -> r -> m ()
+addParent (Event {..}) = addParentImpl impl
 
-addProximateCause :: Event m r f -> r -> m ()
-addProximateCause e = addReference e . MkReference Proximate
+addProximate :: Event m r s f -> r -> m ()
+addProximate (Event {..}) = addProximateImpl impl
 
-data ReferenceType
-  = Parent
-  | Proximate
+finalize :: (Monad m) => Event m r s f -> m ()
+finalize (Event {..}) = runOnce finishFlag $ finalizeImpl impl
 
-noopEvent :: Applicative m => r -> Event m r f
-noopEvent ref = MkEvent
-  { ref
-  , addField = \_ -> pure ()
-  , addReference = \_ -> pure ()
-  , finalize = pure ()
-  , failEvent = \_ -> pure ()
-  }
+failEvent :: (Monad m) => Event m r s f -> Maybe SomeException -> m ()
+failEvent (Event {..}) = runOnce finishFlag . failImpl impl
 
-noopEventBackend :: Applicative m => r -> EventBackend m r s
-noopEventBackend ref = MkEventBackend
-  { newEvent = \_ -> pure $ noopEvent ref
-  }
+newEvent :: (Applicative m) => EventBackend m r s -> forall f . s f -> m (Event m r s f)
+newEvent backend@(EventBackend {..}) sel = do
+  impl <- newEventImpl sel
+  finishFlag <- newOnceFlag
+  pure Event {..}
 
-concatEvent :: Applicative m => Event m a f -> Event m b f -> Event m (a, b) f
-concatEvent x y = MkEvent
-  { ref = (ref x,  ref y)
-  , addField = \f -> addField x f *> addField y f
-  , addReference = \(MkReference ty (rx, ry)) -> addReference x (MkReference ty rx) *> addReference y (MkReference ty ry)
-  , finalize = finalize x *> finalize y
-  , failEvent = \e -> failEvent x e *> failEvent y e
-  }
+newSubEvent :: (Monad m) => Event m r s f -> forall f' . s f' -> m (Event m r s f')
+newSubEvent (Event {..}) sel = do
+  child <- newEvent backend sel
+  addParent child $ referenceImpl impl
+  pure child
 
-concatEventBackend :: Applicative m => EventBackend m a s -> EventBackend m b s -> EventBackend m (a, b) s
-concatEventBackend x y = MkEventBackend
-  { newEvent = \sel -> liftA2 concatEvent (newEvent x sel) (newEvent y sel)
-  }
-
-hoistEvent :: (Functor m) => (forall x . m x -> n x) -> Event m r f -> Event n r f
-hoistEvent nt (MkEvent {..}) = MkEvent
-  { ref
-  , addField = nt . addField
-  , addReference = nt . addReference
-  , finalize = nt $ finalize
-  , failEvent = nt . failEvent
-  }
-
-hoistEventBackend :: (Functor m) => (forall x . m x -> n x) -> EventBackend m r s -> EventBackend n r s
-hoistEventBackend nt eb = MkEventBackend
-  { newEvent = nt . fmap (hoistEvent nt) . newEvent eb
-  }
-
-narrowEvent :: (f -> g) -> Event m r g -> Event m r f
-narrowEvent inj (MkEvent {..}) = MkEvent
-  { addField = addField . inj
-  , ..
-  }
-
-narrowEventBackend' :: (Functor m) => (forall f . s f -> forall a . (forall g . t g -> (f -> g) -> a) -> a) -> EventBackend m r t -> EventBackend m r s
-narrowEventBackend' inj eb = MkEventBackend
-  { newEvent = \sel -> inj sel \sel' inj' -> narrowEvent inj' <$> (newEvent eb sel')
-  }
-
-narrowEventBackend :: (forall f . s f -> t f) -> EventBackend m r t -> EventBackend m r s
-narrowEventBackend inj eb = MkEventBackend
-  { newEvent = newEvent eb . inj
-  }
-
-withEvent :: (MonadMask m) => m (Event m r f) -> (Event m r f -> m a) -> m a
-withEvent makeEv go = do
-    (res, ()) <- generalBracket makeEv release go
+withEvent :: (MonadMask m) => EventBackend m r s -> forall f . s f -> (Event m r s f -> m a) -> m a
+withEvent backend sel go = do
+    (res, ()) <- generalBracket (newEvent backend sel) release go
     pure res
   where
     release ev (ExitCaseSuccess _) = finalize ev
     release ev (ExitCaseException e) = failEvent ev $ Just e
     release ev ExitCaseAbort = failEvent ev Nothing
 
-withSubEvent :: (MonadMask m) => EventBackend m r s -> r -> s f -> (Event m r f -> m a) -> m a
-withSubEvent eb p sel go = withEvent (newEvent eb sel) \ev -> do
-  addParent ev p
-  go ev
+withSubEvent :: (MonadMask m) => Event m r s f -> forall f' . s f' -> (Event m r s f' -> m a) -> m a
+withSubEvent (Event {..}) sel go = withEvent backend sel $ \child -> do
+  addParent child $ referenceImpl impl
+  go child
+
+-- No exception logging pending https://github.com/snoyberg/conduit/issues/460
+acquireEvent :: (MonadUnliftIO m)
+             => EventBackend m r s
+             -> forall f . s f
+             -> m (Acquire (Event m r s f))
+acquireEvent backend sel = withRunInIO $ \runInIO ->
+    pure $ mkAcquireType
+      (runInIO $ newEvent backend sel)
+      (release runInIO)
+  where
+    release runInIO ev ReleaseException = runInIO $ failEvent ev Nothing
+    release runInIO ev _ = runInIO $ finalize ev
+
+acquireSubEvent :: (MonadUnliftIO m)
+                => Event m r s f
+                -> forall f' . s f'
+                -> m (Acquire (Event m r s f'))
+acquireSubEvent (Event {..}) sel = do
+  childAcq <- acquireEvent backend sel
+  withRunInIO $ \runInIO -> pure $ do
+    child <- childAcq
+    liftIO . runInIO . addParent child $ referenceImpl impl
+    pure child
+
+subEventBackend :: (Monad m) => Event m r s f -> EventBackend m r s
+subEventBackend ev@(Event {..}) = EventBackend
+  { newEventImpl = \sel -> do
+      EventImpl {..} <- newEventImpl backend sel
+      parentAdded <- newOnceFlag backend
+      pure $ EventImpl
+        { addParentImpl = \r -> do
+            _ <- checkAndSet parentAdded
+            addParentImpl r
+        , finalizeImpl = do
+            runOnce parentAdded (addParentImpl $ reference ev)
+            finalizeImpl
+        , failImpl = \e -> do
+            runOnce parentAdded (addParentImpl $ reference ev)
+            failImpl e
+        , ..
+        }
+  , newOnceFlag = newOnceFlag backend
+  }
+
+unitEventBackend :: Applicative m => EventBackend m () s
+unitEventBackend = EventBackend
+  { newEventImpl = \_ -> pure $ EventImpl
+    { referenceImpl = ()
+    , addFieldImpl = const $ pure ()
+    , addParentImpl = const $ pure ()
+    , addProximateImpl = const $ pure ()
+    , finalizeImpl = pure ()
+    , failImpl = const $ pure ()
+    }
+  , newOnceFlag = pure . OnceFlag $ pure NewlySet
+  }
+
+pairEventBackend :: Applicative m => EventBackend m a s -> EventBackend m b s -> EventBackend m (a, b) s
+pairEventBackend x y = EventBackend
+  { newEventImpl = \sel -> do
+      xImpl <- newEventImpl x sel
+      yImpl <- newEventImpl y sel
+      pure $ EventImpl
+        { referenceImpl = (referenceImpl xImpl, referenceImpl yImpl)
+        , addFieldImpl = \f -> addFieldImpl xImpl f *> addFieldImpl yImpl f
+        , addParentImpl = \(px, py) -> addParentImpl xImpl px *> addParentImpl yImpl py
+        , addProximateImpl = \(px, py) -> addProximateImpl xImpl px *> addProximateImpl yImpl py
+        , finalizeImpl = finalizeImpl xImpl *> finalizeImpl yImpl
+        , failImpl = \e -> failImpl xImpl e *> failImpl yImpl e
+        }
+  , newOnceFlag = do
+      xOnce <- newOnceFlag x
+      yOnce <- newOnceFlag y
+      pure $ OnceFlag $ do
+        xSet <- checkAndSet xOnce
+        ySet <- checkAndSet yOnce
+        pure $ case (xSet, ySet) of
+          (NewlySet, NewlySet) -> NewlySet
+          _ -> AlreadySet
+  }
+
+hoistEventBackend :: (Functor m, Functor n) => (forall x . m x -> n x) -> EventBackend m r s -> EventBackend n r s
+hoistEventBackend nt backend = EventBackend
+    { newEventImpl = nt . fmap hoistEventImpl . newEventImpl backend
+    , newOnceFlag = hoistOnceFlag nt <$> (nt $ newOnceFlag backend)
+    }
+  where
+    hoistEventImpl (EventImpl {..}) = EventImpl
+      { referenceImpl
+      , addFieldImpl = nt . addFieldImpl
+      , addParentImpl = nt . addParentImpl
+      , addProximateImpl = nt . addProximateImpl
+      , finalizeImpl = nt $ finalizeImpl
+      , failImpl = nt . failImpl
+      }
+
+narrowEventBackend' :: (Functor m)
+                    => (forall f . s f -> forall a . (forall g . t g -> (f -> g) -> a) -> a)
+                    -> EventBackend m r t
+                    -> EventBackend m r s
+narrowEventBackend' inj backend = EventBackend
+  { newEventImpl = \sel -> inj sel \sel' injField -> newEventImpl backend sel' <&> \case
+      EventImpl {..} -> EventImpl
+        { addFieldImpl = addFieldImpl . injField
+        , ..
+        }
+  , newOnceFlag = newOnceFlag backend
+  }
+
+narrowEventBackend :: (Functor m)
+                   => (forall f . s f -> t f)
+                   -> EventBackend m r t
+                   -> EventBackend m r s
+narrowEventBackend inj = narrowEventBackend'
+  (\sel withInjField -> withInjField (inj sel) id)

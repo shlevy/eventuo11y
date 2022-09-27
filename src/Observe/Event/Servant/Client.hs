@@ -6,6 +6,7 @@
 {-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE GADTs #-}
 module Observe.Event.Servant.Client where
 
 import Control.Monad.IO.Class
@@ -20,13 +21,14 @@ import Data.ByteString.Lazy.Internal (ByteString(..))
 import Data.Foldable
 import Data.Functor.Alt
 import Data.Text.Encoding
-import Servant.Client.Core.RunClient
+import Servant.Client.Core.RunClient hiding (RunRequest)
 import Control.Monad.Reader
 import Control.Monad.Base
 import Control.Monad.Trans.Control
 import GHC.Generics
-import Servant.Client
-import Servant.Client.Internal.HttpClient
+import Servant.Client hiding (ClientM)
+import Servant.Client.Internal.HttpClient hiding (ClientM)
+import qualified Servant.Client.Internal.HttpClient as S
 import Servant.Client.Core.Request
 import Network.HTTP.Media.RenderHeader
 import Network.HTTP.Media.MediaType
@@ -36,6 +38,12 @@ import Data.Map.Strict (mapKeys)
 
 import Observe.Event
 import Observe.Event.Render.JSON
+
+data RunRequest f where
+  RunRequest :: RunRequest RunRequestField
+
+runRequestJSON :: RenderSelectorJSON RunRequest
+runRequestJSON RunRequest = ("run-request", runRequestFieldJSON)
 
 data RunRequestField
   = ReqField Request
@@ -106,41 +114,38 @@ clientErrorJSON (UnsupportedContentType ty res) =
 clientErrorJSON (InvalidContentTypeHeader res) = ("invalid-content-type-header", responseJSON res True)
 clientErrorJSON (ConnectionError e) = ("connection-error", toJSON $ show e)
 
-data EventfulClientState r = MkEventfulClientState
-  { mkE :: !(ClientM (Event ClientM r RunRequestField))
-  , refs :: !([ Reference r ])
+data ClientState r = ClientState
+  { backend :: !(EventBackend S.ClientM r RunRequest)
+  , parents :: !(Maybe r)
   }
 
-newtype EventfulClientM r a = MkEventfulClientM (ReaderT (EventfulClientState r) ClientM a) deriving newtype (Monad, Functor, Applicative, MonadIO, MonadThrow, MonadCatch, MonadError ClientError, MonadBase IO, MonadReader (EventfulClientState r)) deriving stock (Generic)
+newtype ClientM r a = ClientM (ReaderT (ClientState r) S.ClientM a) deriving newtype (Monad, Functor, Applicative, MonadIO, MonadThrow, MonadCatch, MonadError ClientError, MonadBase IO, MonadReader (ClientState r)) deriving stock (Generic)
 
-instance MonadBaseControl IO (EventfulClientM r) where
-  type StM (EventfulClientM r) a = Either ClientError a
+instance MonadBaseControl IO (ClientM r) where
+  type StM (ClientM r) a = Either ClientError a
 
-  liftBaseWith go = MkEventfulClientM $ ReaderT \st -> liftBaseWith (\run -> go (run . flip runReaderT st . coerce))
-  restoreM = MkEventfulClientM . lift . restoreM
+  liftBaseWith go = ClientM $ ReaderT \st -> liftBaseWith (\run -> go (run . flip runReaderT st . coerce))
+  restoreM = ClientM . lift . restoreM
 
-instance Alt (EventfulClientM r) where
-  x <!> y = MkEventfulClientM $ ReaderT \st -> (runReaderT (coerce x) st) <!> (runReaderT (coerce y) st)
+instance Alt (ClientM r) where
+  x <!> y = ClientM $ ReaderT \st -> (runReaderT (coerce x) st) <!> (runReaderT (coerce y) st)
 
-  some x = MkEventfulClientM $ ReaderT \st -> some (runReaderT (coerce x) st)
-  many x = MkEventfulClientM $ ReaderT \st -> many (runReaderT (coerce x) st)
+  some x = ClientM $ ReaderT \st -> some (runReaderT (coerce x) st)
+  many x = ClientM $ ReaderT \st -> many (runReaderT (coerce x) st)
 
-instance RunClient (EventfulClientM r) where
+instance RunClient (ClientM r) where
   -- ClientM internals needed pending a release with https://github.com/haskell-servant/servant/commit/658585a7cd2191d1387786d236b8b64cd4a13cb6
-  runRequestAcceptStatus stats req = MkEventfulClientM $ ReaderT \st -> ClientM $ withEvent (hoistEvent unClientM <$> unClientM (mkE st)) \ev' -> unClientM $ do
-    let ev = hoistEvent ClientM ev'
-    addField ev $ ReqField req
-    traverse_ (addReference ev) (refs st)
-    res <- runRequestAcceptStatus stats req
-    addField ev $ ResField res
-    pure res
-  throwClientError = MkEventfulClientM . lift . throwClientError
+  runRequestAcceptStatus stats req = ClientM $ ReaderT \st -> S.ClientM $
+    withEvent (hoistEventBackend unClientM (backend st)) RunRequest \ev -> do
+      addField ev $ ReqField req
+      traverse_ (addParent ev) (parents st)
+      res <- unClientM $ runRequestAcceptStatus stats req
+      addField ev $ ResField res
+      pure res
+  throwClientError = ClientM . lift . throwClientError
 
-runEventfulClientM :: ClientM (Event ClientM r RunRequestField) -> EventfulClientM r a -> ClientEnv -> IO (Either ClientError a)
-runEventfulClientM mkE c = runClientM (runReaderT (coerce c) (MkEventfulClientState mkE []))
+runEventfulClientM :: EventBackend S.ClientM r RunRequest -> ClientM r a -> ClientEnv -> IO (Either ClientError a)
+runEventfulClientM backend c = runClientM (runReaderT (coerce c) (ClientState backend Nothing))
 
-withReferences :: [Reference r] -> EventfulClientM r a -> EventfulClientM r a
-withReferences refs' = local (\st -> st { refs = refs' ++ refs st })
-
-withParent :: r -> EventfulClientM r a -> EventfulClientM r a
-withParent = withReferences . (: []) . MkReference Parent
+withParent :: r -> ClientM r a -> ClientM r a
+withParent parent = local (\st -> st { parents = Just parent })

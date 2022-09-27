@@ -10,7 +10,7 @@
   {
     flags = {};
     package = {
-      specVersion = "3.4";
+      specVersion = "3.0";
       identifier = { name = "eventuo11y"; version = "0.1.0.0"; };
       license = "Apache-2.0";
       copyright = "Copyright 2022 Shea Levy.";
@@ -41,6 +41,8 @@
           (hsPkgs."case-insensitive" or (errorHandler.buildDepError "case-insensitive"))
           (hsPkgs."containers" or (errorHandler.buildDepError "containers"))
           (hsPkgs."exceptions" or (errorHandler.buildDepError "exceptions"))
+          (hsPkgs."resourcet" or (errorHandler.buildDepError "resourcet"))
+          (hsPkgs."unliftio-core" or (errorHandler.buildDepError "unliftio-core"))
           (hsPkgs."http-types" or (errorHandler.buildDepError "http-types"))
           (hsPkgs."monad-control" or (errorHandler.buildDepError "monad-control"))
           (hsPkgs."mtl" or (errorHandler.buildDepError "mtl"))
@@ -59,9 +61,11 @@
         buildable = true;
         modules = [
           "Observe/Event"
+          "Observe/Event/Implementation"
           "Observe/Event/Dynamic"
           "Observe/Event/Render/IO/JSON"
           "Observe/Event/Render/JSON"
+          "Observe/Event/Crash"
           "Observe/Event/Servant/Client"
           "Observe/Event/Wai"
           ];

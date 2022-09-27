@@ -16,7 +16,8 @@ renderDynamicFieldJSON :: RenderFieldJSON DynamicField
 renderDynamicFieldJSON f = (fromText (name f), value f)
 
 renderDynamicEventSelectorJSON :: RenderSelectorJSON DynamicEventSelector
-renderDynamicEventSelectorJSON (MkDynamicEventSelector n) = (fromText n, renderDynamicFieldJSON)
+renderDynamicEventSelectorJSON (DynamicEventSelector n) =
+  (fromText n, renderDynamicFieldJSON)
 
 type RenderExJSON stex = stex -> Value
 

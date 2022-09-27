@@ -2,12 +2,10 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE GADTs #-}
 module Observe.Event.Wai where
 
-import Control.Concurrent.Async
-import Control.Concurrent.MVar
 import Control.Exception
-import Control.Monad
 import Data.Aeson
 import Data.CaseInsensitive
 import Data.Text.Encoding
@@ -17,10 +15,15 @@ import Network.Socket
 import Network.Wai
 import Network.Wai.Internal
 import Network.Wai.Handler.Warp
-import Data.Void
 
 import Observe.Event
 import Observe.Event.Render.JSON
+
+data ServeRequest f where
+  ServeRequest :: ServeRequest RequestField
+
+renderServeRequest :: RenderSelectorJSON ServeRequest
+renderServeRequest ServeRequest = ("serve-request", renderRequestField)
 
 data RequestField
   = ReqField Request
@@ -59,35 +62,21 @@ renderRequestField (ReqField req) =
   )
 renderRequestField (ResField res) = ("response-status" .= (statusCode $ responseStatus res))
 
-eventfulApplication
-  :: IO (Event IO r RequestField)
+application
+  :: EventBackend IO r ServeRequest
   -> (r -> Application)
   -> Application
-eventfulApplication mkE app req respond = withEvent mkE \ev -> do
+application backend app req respond = withEvent backend ServeRequest \ev -> do
   addField ev $ ReqField req
-  app (ref ev) req \res -> do
+  app (reference ev) req \res -> do
     addField ev $ ResField res
     respond res
 
-type ScheduleShutdown m r = Maybe r -> m ()
+data OnException f where
+  OnException :: OnException OnExceptionField
 
-hoistScheduleShutdown
-  :: (forall x . f x -> g x)
-  -> ScheduleShutdown f r
-  -> ScheduleShutdown g r
-hoistScheduleShutdown nt s = nt . s
-
-withScheduleShutdownHandler :: IO (Event IO r Void) -> (ScheduleShutdown IO r -> (IO () -> IO ()) -> IO a) -> IO a
-withScheduleShutdownHandler mkEv go = do
-  closeSocketChan <- newEmptyMVar
-  shutdownChan <- newEmptyMVar
-  let waitForShutdown = do
-        (closeSocket, cause) <- concurrently (takeMVar closeSocketChan) (takeMVar shutdownChan)
-        withEvent mkEv \ev ->
-          maybe (pure ()) (addProximateCause ev) cause
-        closeSocket
-  withAsync waitForShutdown \_ ->
-    go (void . tryPutMVar shutdownChan) (putMVar closeSocketChan)
+renderOnException :: (Exception stex) => RenderExJSON stex -> RenderSelectorJSON OnException
+renderOnException renderEx OnException = ("on-exception", renderOnExceptionField renderEx)
 
 data OnExceptionField = OnExceptionField (Maybe Request) SomeException
 
@@ -100,7 +89,7 @@ renderOnExceptionField renderEx (OnExceptionField mreq e) =
       )
   )
 
-eventfulOnException :: IO (Event IO r OnExceptionField) -> Maybe Request -> SomeException -> IO ()
-eventfulOnException mkE req e = if defaultShouldDisplayException e
-  then withEvent mkE \ev -> addField ev $ OnExceptionField req e
+onException :: EventBackend IO r OnException -> Maybe Request -> SomeException -> IO ()
+onException backend req e = if defaultShouldDisplayException e
+  then withEvent backend OnException \ev -> addField ev $ OnExceptionField req e
   else pure ()
