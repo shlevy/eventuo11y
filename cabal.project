@@ -1,6 +1,9 @@
 index-state: 2022-09-26T00:00:00Z
 packages:
-  .
+  . eventuo11y-batteries
 
 package eventuo11y
+  ghc-options: -Wall
+
+package eventuo11y-batteries
   ghc-options: -Wall
