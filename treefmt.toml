@@ -1,0 +1,17 @@
+[formatter.nix]
+command = "alejandra"
+includes = [ "*.nix" ]
+excludes = [ "nix/materialized*" ]
+
+[formatter.cabal]
+command = "cabal-fmt"
+options = ["--inplace"]
+includes = ["*.cabal"]
+
+[formatter.haskell]
+command = "ormolu"
+options = [
+    "--mode", "inplace",
+    "--check-idempotence",
+]
+includes = ["*.hs"]

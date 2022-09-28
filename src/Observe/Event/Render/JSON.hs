@@ -1,5 +1,6 @@
-{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE RankNTypes #-}
+
 module Observe.Event.Render.JSON where
 
 import Control.Exception
@@ -10,7 +11,7 @@ import Observe.Event.Dynamic
 
 type RenderFieldJSON field = field -> (Key, Value)
 
-type RenderSelectorJSON sel = forall f . sel f -> (Key, RenderFieldJSON f)
+type RenderSelectorJSON sel = forall f. sel f -> (Key, RenderFieldJSON f)
 
 renderDynamicFieldJSON :: RenderFieldJSON DynamicField
 renderDynamicFieldJSON f = (fromText (name f), value f)
@@ -21,7 +22,7 @@ renderDynamicEventSelectorJSON (DynamicEventSelector n) =
 
 type RenderExJSON stex = stex -> Value
 
-data SomeJSONException = forall e . (Exception e, ToJSON e) => SomeJSONException e
+data SomeJSONException = forall e. (Exception e, ToJSON e) => SomeJSONException e
 
 instance Show SomeJSONException where
   show (SomeJSONException e) = show e

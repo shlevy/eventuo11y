@@ -1,16 +1,16 @@
-{-# LANGUAGE GADTs #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE GADTs #-}
+
 module Observe.Event.Dynamic where
 
 import Data.Aeson
 import Data.String
 import Data.Text
-
 import Observe.Event
 
 data DynamicField = DynamicField
-  { name :: !Text
-  , value :: !Value
+  { name :: !Text,
+    value :: !Value
   }
 
 instance (ToJSON x) => IsString (x -> DynamicField) where
