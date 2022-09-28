@@ -2,9 +2,12 @@ cabal-version:      3.0
 name:               eventuo11y-batteries
 version:            0.1.0.0
 synopsis:           Grab bag of eventuo11y-enriched functionality
+description:
+  Miscellaneous helpers for instrumenting with [eventuo11y](https://hackage.haskell.org/package/eventuo11y) and 3rd-party packages.
+
 bug-reports:        https://github.com/shlevy/eventuo11y/issues
 license:            Apache-2.0
-license-file:       ../LICENSE
+license-file:       LICENSE
 author:             Shea Levy
 maintainer:         shea@shealevy.com
 copyright:          Copyright 2022 Shea Levy.

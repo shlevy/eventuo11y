@@ -19,11 +19,11 @@
       homepage = "";
       url = "";
       synopsis = "Grab bag of eventuo11y-enriched functionality";
-      description = "";
+      description = "Miscellaneous helpers for instrumenting with [eventuo11y](https://hackage.haskell.org/package/eventuo11y) and 3rd-party packages.";
       buildType = "Simple";
       isLocal = true;
       detailLevel = "FullDetails";
-      licenseFiles = [ "../LICENSE" ];
+      licenseFiles = [ "LICENSE" ];
       dataDir = ".";
       dataFiles = [];
       extraSrcFiles = [ "CHANGELOG.md" ];

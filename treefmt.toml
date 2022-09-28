@@ -3,10 +3,7 @@ command = "alejandra"
 includes = [ "*.nix" ]
 excludes = [ "nix/materialized/*" ]
 
-[formatter.cabal]
-command = "cabal-fmt"
-options = ["--inplace"]
-includes = ["*.cabal"]
+# cabal-fmt breaks multi-line description
 
 [formatter.haskell]
 command = "ormolu"
