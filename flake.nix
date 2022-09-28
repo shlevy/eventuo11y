@@ -98,6 +98,10 @@
             flake.packages
             // {
               default = flake.packages.${defaultPackageName};
+
+              all = pkgs.runCommand "all" {} (pkgs.lib.concatStringsSep "\n" (map (name: ''
+                echo ${name} = ${hydraJobs.${name}} >> $out
+              '') (builtins.attrNames hydraJobs)));
             };
 
           apps =
@@ -119,7 +123,7 @@
                   .outPath;
               };
             };
-          hydraJobs = builtins.removeAttrs self.packages.${evalSystem} ["default"];
+          hydraJobs = builtins.removeAttrs self.packages.${evalSystem} ["default" "all"];
         });
   in
     flake inputs
