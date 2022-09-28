@@ -19,16 +19,32 @@ import Network.Wai.Internal
 import Observe.Event
 import Observe.Event.Render.JSON
 
+-- | Run an 'Application' with generic 'Request'/'Response' instrumentation.
+application ::
+  EventBackend IO r ServeRequest ->
+  -- | The application, called with a reference to the parent event.
+  (r -> Application) ->
+  Application
+application backend app req respond = withEvent backend ServeRequest \ev -> do
+  addField ev $ ReqField req
+  app (reference ev) req \res -> do
+    addField ev $ ResField res
+    respond res
+
+-- | Event selector for 'application'.
 data ServeRequest f where
   ServeRequest :: ServeRequest RequestField
 
+-- | Render a 'ServeRequest', and any 'Event's selected by it, to JSON
 renderServeRequest :: RenderSelectorJSON ServeRequest
 renderServeRequest ServeRequest = ("serve-request", renderRequestField)
 
+-- | A field for v'ServeRequest' 'Event's.
 data RequestField
   = ReqField Request
   | ResField Response
 
+-- | Render a 'Request' to JSON.
 renderRequest :: Request -> Value
 renderRequest (Request {..}) =
   Object
@@ -67,6 +83,7 @@ renderRequest (Request {..}) =
            )
     )
 
+-- | Render a 'RequestField' to JSON
 renderRequestField :: RenderFieldJSON RequestField
 renderRequestField (ReqField req) =
   ( "request",
@@ -74,24 +91,26 @@ renderRequestField (ReqField req) =
   )
 renderRequestField (ResField res) = ("response-status" .= (statusCode $ responseStatus res))
 
-application ::
-  EventBackend IO r ServeRequest ->
-  (r -> Application) ->
-  Application
-application backend app req respond = withEvent backend ServeRequest \ev -> do
-  addField ev $ ReqField req
-  app (reference ev) req \res -> do
-    addField ev $ ResField res
-    respond res
+-- | A 'Network.Wai.Handler.Warp.setOnException' callback which creates an 'Event' rendering
+-- 'Exception's.
+onException :: EventBackend IO r OnException -> Maybe Request -> SomeException -> IO ()
+onException backend req e =
+  if defaultShouldDisplayException e
+    then withEvent backend OnException \ev -> addField ev $ OnExceptionField req e
+    else pure ()
 
+-- | Selector for 'Observe.Event.Wai.onException'
 data OnException f where
   OnException :: OnException OnExceptionField
 
+-- | Render an 'OnException', and its selected-for 'Event's, as JSON, with a provided base structured exception type.
 renderOnException :: (Exception stex) => RenderExJSON stex -> RenderSelectorJSON OnException
 renderOnException renderEx OnException = ("on-exception", renderOnExceptionField renderEx)
 
+-- | A field for a v'OnException' 'Event'.
 data OnExceptionField = OnExceptionField (Maybe Request) SomeException
 
+-- | Render an 'OnExceptionField' as JSON, with a provided base structured exception type.
 renderOnExceptionField :: (Exception stex) => RenderExJSON stex -> RenderFieldJSON OnExceptionField
 renderOnExceptionField renderEx (OnExceptionField mreq e) =
   ( "uncaught-exception",
@@ -100,9 +119,3 @@ renderOnExceptionField renderEx (OnExceptionField mreq e) =
           <> maybe ("unstructured-exception" .= show e) (("structured-exception" .=) . renderEx) (fromException e)
       )
   )
-
-onException :: EventBackend IO r OnException -> Maybe Request -> SomeException -> IO ()
-onException backend req e =
-  if defaultShouldDisplayException e
-    then withEvent backend OnException \ev -> addField ev $ OnExceptionField req e
-    else pure ()

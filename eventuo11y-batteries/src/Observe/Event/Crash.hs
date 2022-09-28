@@ -13,25 +13,25 @@ import Data.Void
 import Observe.Event
 import Observe.Event.Render.JSON
 
+-- | Function to schedule an application crash, perhaps caused by a referenced 'Event'.
 type ScheduleCrash m r = Maybe r -> m ()
 
+-- | Function to actually initiate the crash.
 type DoCrash m = m ()
 
+-- | Hoist a 'ScheduleCrash' along a given natural transformation into a new functor.
 hoistScheduleCrash ::
+  -- | Natural transformation from @f@ to @g@.
   (forall x. f x -> g x) ->
   ScheduleCrash f r ->
   ScheduleCrash g r
 hoistScheduleCrash nt s = nt . s
 
-data Crashing f where
-  Crashing :: Crashing Void
-
-renderCrashing :: RenderSelectorJSON Crashing
-renderCrashing Crashing = ("crashing", absurd)
-
+-- | Run an action with a 'ScheduleCrash' to crash the application.
 withScheduleCrash ::
   (MonadUnliftIO m) =>
   EventBackend m r Crashing ->
+  -- | Actually perform the crash.
   DoCrash m ->
   (ScheduleCrash m r -> m a) ->
   m a
@@ -47,3 +47,11 @@ withScheduleCrash backend crash go = withRunInIO $ \runInIO -> do
         runInIO crash
   withAsync waitForCrash \_ ->
     runInIO $ go $ void . liftIO . tryPutMVar scheduleCrashChan
+
+-- | Event selector for 'withScheduleCrash'.
+data Crashing f where
+  Crashing :: Crashing Void
+
+-- | Render a 'Crashing' and its sub-events to JSON.
+renderCrashing :: RenderSelectorJSON Crashing
+renderCrashing Crashing = ("crashing", absurd)
