@@ -4,7 +4,34 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE RecordWildCards #-}
 
-module Observe.Event.Wai where
+-- |
+-- Description : Instrument wai with eventuo11y
+-- Copyright   : Copyright 2022 Shea Levy.
+-- License     : Apache-2.0
+-- Maintainer  : shea@shealevy.com
+module Observe.Event.Wai
+  ( -- * Application
+    application,
+
+    -- ** Instrumentation
+    ServeRequest (..),
+    renderServeRequest,
+    RequestField (..),
+    renderRequestField,
+
+    -- * setOnException
+    onExceptionCallback,
+
+    -- ** Instrumentation
+    OnException (..),
+    renderOnException,
+    OnExceptionField (..),
+    renderOnExceptionField,
+
+    -- * Miscellaneous instrumentation
+    renderRequest,
+  )
+where
 
 import Control.Exception
 import Data.Aeson
@@ -44,6 +71,43 @@ data RequestField
   = ReqField Request
   | ResField Response
 
+-- | Render a 'RequestField' to JSON
+renderRequestField :: RenderFieldJSON RequestField
+renderRequestField (ReqField req) =
+  ( "request",
+    renderRequest req
+  )
+renderRequestField (ResField res) = ("response-status" .= (statusCode $ responseStatus res))
+
+-- | A 'Network.Wai.Handler.Warp.setOnException' callback which creates an 'Event' rendering
+-- 'Exception's.
+onExceptionCallback :: EventBackend IO r OnException -> Maybe Request -> SomeException -> IO ()
+onExceptionCallback backend req e =
+  if defaultShouldDisplayException e
+    then withEvent backend OnException \ev -> addField ev $ OnExceptionField req e
+    else pure ()
+
+-- | Selector for 'Observe.Event.Wai.onException'
+data OnException f where
+  OnException :: OnException OnExceptionField
+
+-- | Render an 'OnException', and its selected-for 'Event's, as JSON, with a provided base structured exception type.
+renderOnException :: (Exception stex) => RenderExJSON stex -> RenderSelectorJSON OnException
+renderOnException renderEx OnException = ("on-exception", renderOnExceptionField renderEx)
+
+-- | A field for a v'OnException' 'Event'.
+data OnExceptionField = OnExceptionField (Maybe Request) SomeException
+
+-- | Render an 'OnExceptionField' as JSON, with a provided base structured exception type.
+renderOnExceptionField :: (Exception stex) => RenderExJSON stex -> RenderFieldJSON OnExceptionField
+renderOnExceptionField renderEx (OnExceptionField mreq e) =
+  ( "uncaught-exception",
+    Object
+      ( maybe mempty (("request" .=) . renderRequest) mreq
+          <> maybe ("unstructured-exception" .= show e) (("structured-exception" .=) . renderEx) (fromException e)
+      )
+  )
+
 -- | Render a 'Request' to JSON.
 renderRequest :: Request -> Value
 renderRequest (Request {..}) =
@@ -82,40 +146,3 @@ renderRequest (Request {..}) =
                else "headers" .= fmap (\(nm, val) -> Object ("name" .= decodeUtf8 (original nm) <> (if nm == "Authorization" then mempty else "val" .= decodeUtf8 val))) requestHeaders
            )
     )
-
--- | Render a 'RequestField' to JSON
-renderRequestField :: RenderFieldJSON RequestField
-renderRequestField (ReqField req) =
-  ( "request",
-    renderRequest req
-  )
-renderRequestField (ResField res) = ("response-status" .= (statusCode $ responseStatus res))
-
--- | A 'Network.Wai.Handler.Warp.setOnException' callback which creates an 'Event' rendering
--- 'Exception's.
-onException :: EventBackend IO r OnException -> Maybe Request -> SomeException -> IO ()
-onException backend req e =
-  if defaultShouldDisplayException e
-    then withEvent backend OnException \ev -> addField ev $ OnExceptionField req e
-    else pure ()
-
--- | Selector for 'Observe.Event.Wai.onException'
-data OnException f where
-  OnException :: OnException OnExceptionField
-
--- | Render an 'OnException', and its selected-for 'Event's, as JSON, with a provided base structured exception type.
-renderOnException :: (Exception stex) => RenderExJSON stex -> RenderSelectorJSON OnException
-renderOnException renderEx OnException = ("on-exception", renderOnExceptionField renderEx)
-
--- | A field for a v'OnException' 'Event'.
-data OnExceptionField = OnExceptionField (Maybe Request) SomeException
-
--- | Render an 'OnExceptionField' as JSON, with a provided base structured exception type.
-renderOnExceptionField :: (Exception stex) => RenderExJSON stex -> RenderFieldJSON OnExceptionField
-renderOnExceptionField renderEx (OnExceptionField mreq e) =
-  ( "uncaught-exception",
-    Object
-      ( maybe mempty (("request" .=) . renderRequest) mreq
-          <> maybe ("unstructured-exception" .= show e) (("structured-exception" .=) . renderEx) (fromException e)
-      )
-  )

@@ -1,7 +1,33 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE RankNTypes #-}
 
-module Observe.Event.Render.JSON where
+-- |
+-- Description : Renderers for serializing Events as JSON
+-- Copyright   : Copyright 2022 Shea Levy.
+-- License     : Apache-2.0
+-- Maintainer  : shea@shealevy.com
+--
+-- Instrumentors will need to provide instances of 'RenderSelectorJSON'
+-- and 'RenderFieldJSON' for their domain-specific types to use their
+--  t'Observe.Event.Event's with JSON-consuming t'Observe.Event.EventBackend's.
+module Observe.Event.Render.JSON
+  ( RenderSelectorJSON,
+    RenderFieldJSON,
+
+    -- * Rendering structured exceptions
+    RenderExJSON,
+
+    -- ** SomeJSONException
+    renderJSONException,
+    SomeJSONException (..),
+    jsonExceptionToException,
+    jsonExceptionFromException,
+
+    -- * Observe.Event.Dynamic support
+    renderDynamicEventSelectorJSON,
+    renderDynamicFieldJSON,
+  )
+where
 
 import Control.Exception
 import Data.Aeson
@@ -9,28 +35,28 @@ import Data.Aeson.Key
 import Data.Typeable
 import Observe.Event.Dynamic
 
+-- | A function to render a given selector, its fields, as JSON.
+--
+-- The 'Key' is the event name/category.
+type RenderSelectorJSON sel = forall f. sel f -> (Key, RenderFieldJSON f)
+
 -- | A function to render a given @field@ as JSON.
 --
 -- The 'Key' is a field name, the 'Value' is an arbitrary
 -- rendering of the field value (if any).
 type RenderFieldJSON field = field -> (Key, Value)
 
--- | A function to render a given selector, its fields, as JSON.
---
--- The 'Key' is the event name/category.
-type RenderSelectorJSON sel = forall f. sel f -> (Key, RenderFieldJSON f)
-
--- | Render a 'DynamicField'
-renderDynamicFieldJSON :: RenderFieldJSON DynamicField
-renderDynamicFieldJSON f = (fromText (name f), value f)
+-- | A function to render a given structured exception to JSON.
+type RenderExJSON stex = stex -> Value
 
 -- | Render a 'DynamicEventSelector' and all its sub-fields.
 renderDynamicEventSelectorJSON :: RenderSelectorJSON DynamicEventSelector
 renderDynamicEventSelectorJSON (DynamicEventSelector n) =
   (fromText n, renderDynamicFieldJSON)
 
--- | A function to render a given structured exception to JSON.
-type RenderExJSON stex = stex -> Value
+-- | Render a 'DynamicField'
+renderDynamicFieldJSON :: RenderFieldJSON DynamicField
+renderDynamicFieldJSON f = (fromText (name f), value f)
 
 -- | Render a 'SomeJSONException' to JSON.
 --

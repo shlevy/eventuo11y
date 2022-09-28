@@ -5,31 +5,76 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE RecordWildCards #-}
 
+-- |
+-- Description : Core interface for instrumentation with eventuo11y
+-- Copyright   : Copyright 2022 Shea Levy.
+-- License     : Apache-2.0
+-- Maintainer  : shea@shealevy.com
+--
+-- This is the primary module needed to instrument code with eventuo11y.
+--
+-- Instrumentors should first define selector types and field types
+-- appropriate to the unit of code they're instrumenting:
+--
+-- Selectors are values which designate the general category of event
+-- being created, parameterized by the type of fields that can be added to it.
+-- For example, a web service's selector type may have a @ServicingRequest@
+-- constructor, whose field type includes a @ResponseCode@ constructor which
+-- records the HTTP status code. Selectors are intended to be of a domain-specific
+-- type per unit of functionality within an instrumented codebase, implemented as a GADT
+-- (but see t'Observe.Event.Dynamic.DynamicEventSelector' for a generic option).
+--
+-- Fields make up the basic data captured in an event. They should be added
+-- to an 'Event' as the code progresses through various phases of work, and can
+-- be both milestone markers ("we got this far in the process") or more detailed
+-- instrumentation ("we've processed N records"). They are intended to be of a
+-- domain-specific type per unit of functionality within an instrumented codebase
+-- (but see t'Observe.Event.Dynamic.DynamicField' for a generic option).
+--
+-- Instrumentation then centers around 'Event's, populated using the
+-- <#g:eventmanip event manipulation functions>. 'Event's are initialized
+-- with 'EventBackend's, typically via the
+-- <#g:resourcesafe resource-safe event allocation functions>.
+--
+-- Depending on which 'EventBackend's may end up consuming the 'Event's,
+-- instrumentors will also need to define renderers for their selectors
+-- and fields. For example, they may need to implement values of types
+--  t'Observe.Event.Render.JSON.RenderSelectorJSON' and
+--  t'Observe.Event.Render.JSON.RenderFieldJSON' to use JSON rendering 'EventBackend's.
 module Observe.Event
-  ( EventBackend,
-    Event,
+  ( Event,
 
     -- * Event manipulation #eventmanip#
     reference,
     addField,
     addParent,
     addProximate,
-    finalize,
-    failEvent,
-    newEvent,
-    newSubEvent,
 
-    -- * Resource safe #resourcesafe#
+    -- * Resource-safe event allocation #resourcesafe#
     withEvent,
     withSubEvent,
+
+    -- ** Acquire/MonadResource variants
     acquireEvent,
     acquireSubEvent,
+
+    -- * 'EventBackend's
+    EventBackend,
     subEventBackend,
     unitEventBackend,
     pairEventBackend,
     hoistEventBackend,
     narrowEventBackend,
     narrowEventBackend',
+
+    -- * Primitive 'Event' resource management.
+
+    -- | Prefer the [resource-safe event allocation functions](#g:resourcesafe)
+    -- to these when possible.
+    finalize,
+    failEvent,
+    newEvent,
+    newSubEvent,
   )
 where
 
@@ -115,7 +160,7 @@ addProximate (Event {..}) = addProximateImpl impl
 -- | Mark an 'Event' as finished.
 --
 -- In normal usage, this should be automatically called via the use of
--- the [resource-safe allocation functions](#g:resourcesafe).
+-- the [resource-safe event allocation functions](#g:resourcesafe).
 --
 -- This is a no-op if the 'Event' has already been 'finalize'd or
 -- 'failEvent'ed. As a result, it is likely pointless to call
@@ -127,7 +172,7 @@ finalize (Event {..}) = runOnce finishFlag $ finalizeImpl impl
 -- | Mark an 'Event' as having failed, possibly due to an 'Exception'.
 --
 -- In normal usage, this should be automatically called via the use of
--- the [resource-safe allocation functions](#g:resourcesafe).
+-- the [resource-safe event allocation functions](#g:resourcesafe).
 --
 -- This is a no-op if the 'Event' has already been 'finalize'd or
 -- 'failEvent'ed. As a result, it is likely pointless to call
@@ -145,7 +190,7 @@ failEvent (Event {..}) = runOnce finishFlag . failImpl impl
 -- functionality within an instrumented codebase, implemented as a GADT
 -- (but see t'Observe.Event.Dynamic.DynamicEventSelector' for a generic option).
 --
--- Consider the [resource-safe allocation functions](#g:resourcesafe) instead
+-- Consider the [resource-safe event allocation functions](#g:resourcesafe) instead
 -- of calling this directly.
 newEvent ::
   (Applicative m) =>
@@ -168,7 +213,7 @@ newEvent backend@(EventBackend {..}) sel = do
 -- functionality within an instrumented codebase, implemented as a GADT
 -- (but see t'Observe.Event.Dynamic.DynamicEventSelector' for a generic option).
 --
--- Consider the [resource-safe allocation functions](#g:resourcesafe) instead
+-- Consider the [resource-safe event allocation functions](#g:resourcesafe) instead
 -- of calling this directly.
 newSubEvent ::
   (Monad m) =>

@@ -1,7 +1,28 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE RankNTypes #-}
 
-module Observe.Event.Implementation where
+-- |
+-- Description : Interface for implementing EventBackends
+-- Copyright   : Copyright 2022 Shea Levy.
+-- License     : Apache-2.0
+-- Maintainer  : shea@shealevy.com
+--
+-- This is the primary module needed to write new 'EventBackend's.
+module Observe.Event.Implementation
+  ( EventBackend (..),
+    EventImpl (..),
+
+    -- * OnceFlags
+
+    -- | Generic helper to make operations idempotent.
+    OnceFlag (..),
+    FlagState (..),
+    runOnce,
+    hoistOnceFlag,
+    alwaysNewOnceFlag,
+    newOnceFlagIO,
+  )
+where
 
 import Control.Concurrent.MVar
 import Control.Exception
@@ -102,7 +123,7 @@ newOnceFlagIO = do
 -- | A 'OnceFlag' which is always 'NewlySet'.
 --
 -- Only safe to use if the operations to be guarded
--- by the flag are idempotent.
+-- by the flag are already idempotent.
 alwaysNewOnceFlag :: (Applicative m) => OnceFlag m
 alwaysNewOnceFlag = OnceFlag $ pure NewlySet
 

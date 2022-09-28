@@ -8,7 +8,31 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TypeFamilies #-}
 
-module Observe.Event.Servant.Client where
+-- |
+-- Description : Instrument servant-client with eventuo11y
+-- Copyright   : Copyright 2022 Shea Levy.
+-- License     : Apache-2.0
+-- Maintainer  : shea@shealevy.com
+--
+-- This module offers a variant of servant-client's 'S.ClientM' which instruments
+-- all requests with 'Event's. It also has miscellaneous helpers for instrumenting
+-- servant-client functionality in other ways.
+module Observe.Event.Servant.Client
+  ( -- * ClientM
+    ClientM (..),
+    runClientM,
+
+    -- ** Instrumentation
+    RunRequest (..),
+    runRequestJSON,
+    RunRequestField (..),
+    runRequestFieldJSON,
+
+    -- * Miscellaneous instrumentation
+    clientErrorJSON,
+    responseJSON,
+  )
+where
 
 import Control.Monad.Base
 import Control.Monad.Catch
@@ -21,7 +45,6 @@ import Data.ByteString.Lazy hiding (null)
 import Data.ByteString.Lazy.Internal (ByteString (..))
 import Data.CaseInsensitive
 import Data.Coerce
-import Data.Foldable
 import Data.Functor.Alt
 import Data.Map.Strict (mapKeys)
 import Data.Text.Encoding
@@ -32,10 +55,10 @@ import Network.HTTP.Types.Status
 import Network.HTTP.Types.Version
 import Observe.Event
 import Observe.Event.Render.JSON
-import Servant.Client hiding (ClientM)
+import Servant.Client hiding (ClientM, runClientM)
 import Servant.Client.Core.Request
 import Servant.Client.Core.RunClient hiding (RunRequest)
-import Servant.Client.Internal.HttpClient hiding (ClientM)
+import Servant.Client.Internal.HttpClient hiding (ClientM, runClientM)
 import qualified Servant.Client.Internal.HttpClient as S
 
 -- | A monad to use in place of 'S.ClientM' to get instrumentation on requests.
@@ -81,25 +104,6 @@ runRequestJSON RunRequest = ("run-request", runRequestFieldJSON)
 data RunRequestField
   = ReqField Request
   | ResField Response
-
--- | Render a 'Servant.Client.Core.Response' as JSON, optionally forcing rendering the body even if it's large.
-responseJSON :: Response -> Bool -> Value
-responseJSON Response {..} forceBody =
-  Object
-    ( "status" .= statusCode responseStatusCode
-        <> ( if null responseHeaders
-               then mempty
-               else "headers" .= fmap (\(nm, val) -> Object ("name" .= decodeUtf8 (original nm) <> (if nm == "Cookie" then mempty else "val" .= decodeUtf8 val))) responseHeaders
-           )
-        <> "http-version" .= Object ("major" .= httpMajor responseHttpVersion <> "minor" .= httpMinor responseHttpVersion)
-        <> ( if forceBody
-               then "body" .= (decodeUtf8 $ toStrict responseBody)
-               else case responseBody of
-                 Empty -> "body" .= False
-                 Chunk bs Empty -> "body" .= decodeUtf8 bs
-                 _ -> mempty
-           )
-    )
 
 -- | Render a 'RunRequestField' as JSON.
 runRequestFieldJSON :: RenderFieldJSON RunRequestField
@@ -162,3 +166,22 @@ clientErrorJSON (UnsupportedContentType ty res) =
   )
 clientErrorJSON (InvalidContentTypeHeader res) = ("invalid-content-type-header", responseJSON res True)
 clientErrorJSON (ConnectionError e) = ("connection-error", toJSON $ show e)
+
+-- | Render a 'Servant.Client.Core.Response' as JSON, optionally forcing rendering the body even if it's large.
+responseJSON :: Response -> Bool -> Value
+responseJSON Response {..} forceBody =
+  Object
+    ( "status" .= statusCode responseStatusCode
+        <> ( if null responseHeaders
+               then mempty
+               else "headers" .= fmap (\(nm, val) -> Object ("name" .= decodeUtf8 (original nm) <> (if nm == "Cookie" then mempty else "val" .= decodeUtf8 val))) responseHeaders
+           )
+        <> "http-version" .= Object ("major" .= httpMajor responseHttpVersion <> "minor" .= httpMinor responseHttpVersion)
+        <> ( if forceBody
+               then "body" .= (decodeUtf8 $ toStrict responseBody)
+               else case responseBody of
+                 Empty -> "body" .= False
+                 Chunk bs Empty -> "body" .= decodeUtf8 bs
+                 _ -> mempty
+           )
+    )
