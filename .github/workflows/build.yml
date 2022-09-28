@@ -18,3 +18,4 @@ jobs:
           name: shlevy
           authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
       - run: nix build .#all --no-update-lock-file --no-link --print-build-logs
+      - run: nix develop . --command treefmt --fail-on-change
