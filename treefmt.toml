@@ -1,7 +1,7 @@
 [formatter.nix]
 command = "alejandra"
 includes = [ "*.nix" ]
-excludes = [ "nix/materialized*" ]
+excludes = [ "nix/materialized/*" ]
 
 [formatter.cabal]
 command = "cabal-fmt"

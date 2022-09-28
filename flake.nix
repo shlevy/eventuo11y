@@ -12,81 +12,139 @@
     nixpkgs,
     flake-utils,
     haskell-nix,
-  }: let
+  } @ inputs: let
+    defaultPackageName = "eventuo11y:lib:eventuo11y";
+    extraShellPackages = pkgs: with pkgs; [treefmt alejandra ormolu haskellPackages.cabal-fmt];
     supportedSystems = ["x86_64-linux"];
-  in
-    flake-utils.lib.eachSystem supportedSystems (system: let
-      pkgs = nixpkgs.legacyPackages.${system}.extend haskell-nix.overlay;
 
-      inherit (pkgs) writeShellScript nix jq coreutils git lib;
+    ifExists = p:
+      if builtins.pathExists p
+      then p
+      else null;
 
-      ifExists = p:
-        if builtins.pathExists p
-        then p
-        else null;
+    flake = {
+      self,
+      nixpkgs,
+      flake-utils,
+      haskell-nix,
+    }:
+      flake-utils.lib.eachSystem supportedSystems (evalSystem: let
+        packagesBySystem = builtins.listToAttrs (map (system: {
+            name = system;
 
-      tools = {
-        cabal = {
-          inherit (project) index-state;
-          materialized = ifExists (./nix + "/cabal-materialized-${system}");
-        };
+            value = let
+              materializedRelative = "/nix/materialized/${system}";
 
-        hoogle = {
-          inherit (project) index-state;
-          materialized = ifExists (./nix + "/hoogle-materialized-${system}");
-        };
-      };
-      project = pkgs.haskell-nix.cabalProject' {
-        src = ./.;
-        compiler-nix-name = "ghc924";
-        shell.tools = tools;
-        shell.nativeBuildInputs = with pkgs; [treefmt alejandra ormolu haskellPackages.cabal-fmt];
-        materialized = ifExists (./nix + "/materialized-${system}");
-      };
+              materializedFor = component: ifExists (./. + materializedRelative + "/${component}");
 
-      flake = project.flake {};
+              pkgs = import nixpkgs {
+                inherit system;
+                overlays = [haskell-nix.overlay];
+                inherit (haskell-nix) config;
+              };
 
-      tools-built = project.tools tools;
-    in
-      flake
-      // {
-        packages =
-          flake.packages
-          // {
-            inherit (project.plan-nix.passthru) generateMaterialized;
-            cabalGenerateMaterialized = tools-built.cabal.project.plan-nix.passthru.generateMaterialized;
-            hoogleGenerateMaterialized = tools-built.hoogle.project.plan-nix.passthru.generateMaterialized;
-          };
-        apps =
-          flake.apps
-          // {
-            updateAllMaterialized = {
-              type = "app";
-              program =
-                (writeShellScript "updateAllMaterialized" ''
-                  set -eEuo pipefail
-                  export PATH="${lib.makeBinPath [nix jq coreutils git]}"
-                  export NIX_CONFIG="
-                    allow-import-from-derivation = true
-                    experimental-features = flakes nix-command
-                  "
-                  ${builtins.concatStringsSep "\n" (map (system: ''
-                      script="$(nix build .#packages.${system}.generateMaterialized --json --no-link | jq -r '.[0].outputs.out')"
-                      echo "Running $script on ./nix/materialized-${system}" >&2
-                      "$script" "./nix/materialized-${system}"
+              tools = {
+                cabal = {
+                  inherit (project) index-state evalSystem;
+                  version = "3.8.1.0";
+                  materialized = materializedFor "cabal";
+                };
+                hoogle = {
+                  inherit (project) index-state evalSystem;
+                  version = "5.0.18.3";
+                  materialized = materializedFor "hoogle";
+                };
+              };
 
-                      script="$(nix build .#packages.${system}.cabalGenerateMaterialized --json --no-link | jq -r '.[0].outputs.out')"
-                      echo "Running $script on ./nix/cabal-materialized-${system}" >&2
-                      "$script" "./nix/cabal-materialized-${system}"
+              project = pkgs.haskell-nix.cabalProject' {
+                inherit evalSystem;
+                src = ./.;
+                compiler-nix-name = "ghc924";
+                shell.tools = tools;
+                shell.nativeBuildInputs = extraShellPackages pkgs;
+                materialized = materializedFor "project";
+              };
 
-                      script="$(nix build .#packages.${system}.hoogleGenerateMaterialized --json --no-link | jq -r '.[0].outputs.out')"
-                      echo "Running $script on ./nix/hoogle-materialized-${system}" >&2
-                      "$script" "./nix/hoogle-materialized-${system}"
-                    '')
-                    supportedSystems)}
-                '')
-                .outPath;
+              tools-built = project.tools tools;
+            in {
+              inherit pkgs project;
+
+              update-all-materialized = evalPkgs.writeShellScript "update-all-materialized-${system}" ''
+                set -eEuo pipefail
+                mkdir -p .${materializedRelative}
+                cd .${materializedRelative}
+                echo "Updating project materialization" >&2
+                ${project.plan-nix.passthru.generateMaterialized} project
+                echo "Updating cabal materialization" >&2
+                ${tools-built.cabal.project.plan-nix.passthru.generateMaterialized} cabal
+                echo "Updating hoogle materialization" >&2
+                ${tools-built.hoogle.project.plan-nix.passthru.generateMaterialized} hoogle
+              '';
             };
+          })
+          supportedSystems);
+
+        inherit (packagesBySystem.${evalSystem}) project pkgs;
+
+        evalPkgs = pkgs;
+
+        flake = project.flake {};
+      in
+        flake
+        // rec {
+          defaultPackage = packages.default;
+
+          packages =
+            flake.packages
+            // {
+              default = flake.packages.${defaultPackageName};
+            };
+
+          apps =
+            flake.apps
+            // {
+              update-all-materialized = {
+                type = "app";
+
+                program =
+                  (pkgs.writeShellScript "update-all-materialized" ''
+                    set -eEuo pipefail
+                    cd "$(${pkgs.git}/bin/git rev-parse --show-toplevel)"
+                    ${pkgs.lib.concatStringsSep "\n" (map (system: ''
+                        echo "Updating materialization for ${system}" >&2
+                        ${packagesBySystem.${system}.update-all-materialized}
+                      '')
+                      supportedSystems)}
+                  '')
+                  .outPath;
+              };
+            };
+          hydraJobs = builtins.removeAttrs self.packages.${evalSystem} ["default"];
+        });
+  in
+    flake inputs
+    // {
+      hydraJobs = {
+        nixpkgs ? inputs.nixpkgs,
+        flake-utils ? inputs.flake-utils,
+        haskell-nix ? inputs.haskell-nix,
+      } @ overrides: let
+        flake' = flake (inputs // overrides // {self = flake';});
+        evalSystem = "x86_64-linux";
+        pkgs = nixpkgs.legacyPackages.${evalSystem};
+      in
+        flake'.hydraJobs
+        // {
+          forceNewEval = pkgs.writeText "forceNewEval" (self.rev or self.lastModified);
+          required = pkgs.releaseTools.aggregate {
+            name = "cicero-pipe";
+            constituents =
+              builtins.concatMap (
+                system:
+                  map (x: "${x}.${system}") (builtins.attrNames flake'.hydraJobs)
+              )
+              supportedSystems;
           };
-      });
+        };
+    };
 }

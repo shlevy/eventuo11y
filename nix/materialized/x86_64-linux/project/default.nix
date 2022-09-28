@@ -272,10 +272,20 @@
         };
       };
   extras = hackage:
-    { packages = { eventuo11y = ./.plan.nix/eventuo11y.nix; }; };
+    {
+      packages = {
+        eventuo11y = ./.plan.nix/eventuo11y.nix;
+        eventuo11y-batteries = ./.plan.nix/eventuo11y-batteries.nix;
+        };
+      };
   modules = [
     ({ lib, ... }:
-      { packages = { "eventuo11y" = { flags = {}; }; }; })
+      {
+        packages = {
+          "eventuo11y" = { flags = {}; };
+          "eventuo11y-batteries" = { flags = {}; };
+          };
+        })
     ({ lib, ... }:
       {
         packages = {
@@ -319,6 +329,7 @@
           "ghc-boot-th".components.library.planned = lib.mkOverride 900 true;
           "scientific".components.library.planned = lib.mkOverride 900 true;
           "boring".components.library.planned = lib.mkOverride 900 true;
+          "eventuo11y-batteries".components.library.planned = lib.mkOverride 900 true;
           "splitmix".components.library.planned = lib.mkOverride 900 true;
           "rts".components.library.planned = lib.mkOverride 900 true;
           "tagged".components.library.planned = lib.mkOverride 900 true;
