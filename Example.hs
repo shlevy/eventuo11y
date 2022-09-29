@@ -3,6 +3,8 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE TypeSynonymInstances #-}
 
 module Main where
 
@@ -29,7 +31,8 @@ import System.Posix.Types
 
 -- We take an EventBackend, polymorphic in r, supporting our domain-specific selector type
 writeToFile :: EventBackend IO r FileSelector -> FilePath -> ByteString -> IO ()
-writeToFile backend path (BS fptr sz) = do
+writeToFile backend path bs = do
+  let (fptr, base_off, sz) = toForeignPtr bs
   -- We start an event, selected by OpenFile
   fd <- withEvent backend OpenFile $ \ev -> do
     -- We add a Filename field to our current active event
@@ -50,7 +53,7 @@ writeToFile backend path (BS fptr sz) = do
           newOffset <- withEvent backend WriteFile $ \ev -> do
             let ct = bcSz - offset
             addField ev $ BytesAsked ct
-            written <- fdWriteBuf fd (plusPtr ptr (fromIntegral offset)) ct
+            written <- fdWriteBuf fd (plusPtr ptr (base_off + fromIntegral offset)) ct
             addField ev $ BytesActual written
             pure $ offset + written
           when (newOffset < bcSz) $
