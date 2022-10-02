@@ -92,6 +92,7 @@
         "tagged".flags.transformers = true;
         "splitmix".revision = (((hackage."splitmix")."0.1.0.4").revisions).default;
         "splitmix".flags.optimised-mixer = false;
+        "recv".revision = (((hackage."recv")."0.0.0").revisions).default;
         "attoparsec".revision = (((hackage."attoparsec")."0.14.4").revisions).default;
         "attoparsec".flags.developer = false;
         "singleton-bool".revision = (((hackage."singleton-bool")."0.1.6").revisions).default;
@@ -203,7 +204,7 @@
         "deepseq".revision = (((hackage."deepseq")."1.4.6.1").revisions).default;
         "unix".revision = (((hackage."unix")."2.7.2.2").revisions).default;
         "blaze-builder".revision = (((hackage."blaze-builder")."0.4.2.2").revisions).default;
-        "warp".revision = (((hackage."warp")."3.3.22").revisions).default;
+        "warp".revision = (((hackage."warp")."3.3.23").revisions).default;
         "warp".flags.network-bytestring = false;
         "warp".flags.x509 = true;
         "warp".flags.allow-sendfilefd = true;
@@ -335,6 +336,7 @@
           "tagged".components.library.planned = lib.mkOverride 900 true;
           "unix".components.library.planned = lib.mkOverride 900 true;
           "simple-sendfile".components.library.planned = lib.mkOverride 900 true;
+          "recv".components.library.planned = lib.mkOverride 900 true;
           "hsc2hs".components.exes."hsc2hs".planned = lib.mkOverride 900 true;
           "vector".components.library.planned = lib.mkOverride 900 true;
           "indexed-traversable-instances".components.library.planned = lib.mkOverride 900 true;

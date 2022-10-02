@@ -98,6 +98,7 @@
         "tagged".flags.transformers = true;
         "splitmix".revision = (((hackage."splitmix")."0.1.0.4").revisions).default;
         "splitmix".flags.optimised-mixer = false;
+        "recv".revision = (((hackage."recv")."0.0.0").revisions).default;
         "attoparsec".revision = (((hackage."attoparsec")."0.14.4").revisions).default;
         "attoparsec".flags.developer = false;
         "tar".revision = (((hackage."tar")."0.5.1.1").revisions).default;
@@ -138,7 +139,7 @@
         "unix-compat".flags.old-time = false;
         "case-insensitive".revision = (((hackage."case-insensitive")."1.2.1.0").revisions).default;
         "http-date".revision = (((hackage."http-date")."0.0.11").revisions).default;
-        "warp-tls".revision = (((hackage."warp-tls")."3.3.3").revisions).default;
+        "warp-tls".revision = (((hackage."warp-tls")."3.3.4").revisions).default;
         "data-default".revision = (((hackage."data-default")."0.7.1.1").revisions).default;
         "time-manager".revision = (((hackage."time-manager")."0.0.0").revisions).default;
         "byteorder".revision = (((hackage."byteorder")."1.0.4").revisions).default;
@@ -238,7 +239,7 @@
         "blaze-builder".revision = (((hackage."blaze-builder")."0.4.2.2").revisions).default;
         "generic-deriving".revision = (((hackage."generic-deriving")."1.14.2").revisions).default;
         "generic-deriving".flags.base-4-9 = true;
-        "warp".revision = (((hackage."warp")."3.3.22").revisions).default;
+        "warp".revision = (((hackage."warp")."3.3.23").revisions).default;
         "warp".flags.network-bytestring = false;
         "warp".flags.x509 = true;
         "warp".flags.allow-sendfilefd = true;
@@ -361,6 +362,7 @@
           "tagged".components.library.planned = lib.mkOverride 900 true;
           "unix".components.library.planned = lib.mkOverride 900 true;
           "simple-sendfile".components.library.planned = lib.mkOverride 900 true;
+          "recv".components.library.planned = lib.mkOverride 900 true;
           "hsc2hs".components.exes."hsc2hs".planned = lib.mkOverride 900 true;
           "vector".components.library.planned = lib.mkOverride 900 true;
           "indexed-traversable-instances".components.library.planned = lib.mkOverride 900 true;
