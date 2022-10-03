@@ -2,6 +2,10 @@
 
 ## 0.2.0.0 -- 2022-10-03
 
+Relax text upper and lower bounds
+
+## 0.2.0.0 -- 2022-10-03
+
 - Add Observe.Event.BackendModification DSL
 - Generalize newOnceFlagIO to newOnceFlagMVar
 
