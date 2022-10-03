@@ -2,6 +2,7 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE RecordWildCards #-}
 
 -- |
 -- Description : Combine eventuo11y instrumentation with crash-only designs.
@@ -27,37 +28,27 @@ module Observe.Event.Crash
   )
 where
 
-import Control.Concurrent.Async
-import Control.Concurrent.MVar
-import Control.Monad
-import Control.Monad.IO.Unlift
+import Control.Monad.Catch
 import Data.Void
 import Observe.Event
+import Observe.Event.BackendModification
 import Observe.Event.Render.JSON
 
 -- | Run an action with a 'ScheduleCrash' that can be called to crash the application.
 withScheduleCrash ::
-  (MonadUnliftIO m) =>
+  (MonadMask m) =>
   EventBackend m r Crashing ->
   -- | Actually perform the crash.
   DoCrash m ->
   (ScheduleCrash m r -> m a) ->
   m a
-withScheduleCrash backend crash go = withRunInIO $ \runInIO -> do
-  scheduleCrashChan <- newEmptyMVar
-  let waitForCrash = do
-        cause <- takeMVar scheduleCrashChan
-        withEvent (hoistEventBackend runInIO backend) Crashing \ev ->
-          maybe
-            (pure ())
-            (addProximate ev)
-            cause
-        runInIO crash
-  withAsync waitForCrash \_ ->
-    runInIO $ go $ void . liftIO . tryPutMVar scheduleCrashChan
+withScheduleCrash backend crash go =
+  go $ ScheduleCrash \mods ->
+    let backend' = modifyEventBackend mods backend
+     in withEvent backend' Crashing $ const crash
 
--- | Function to schedule an application crash, perhaps caused by a referenced 'Event'.
-type ScheduleCrash m r = Maybe r -> m ()
+-- | Function to schedule an application crash.
+newtype ScheduleCrash m r = ScheduleCrash {schedule :: forall r'. EventBackendModifiers r r' -> m ()}
 
 -- | Function to actually initiate the crash.
 type DoCrash m = m ()
@@ -68,7 +59,7 @@ hoistScheduleCrash ::
   (forall x. f x -> g x) ->
   ScheduleCrash f r ->
   ScheduleCrash g r
-hoistScheduleCrash nt s = nt . s
+hoistScheduleCrash nt (ScheduleCrash {..}) = ScheduleCrash $ nt . schedule
 
 -- | Event selector for 'withScheduleCrash'.
 data Crashing f where

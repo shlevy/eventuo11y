@@ -11,7 +11,7 @@
     flags = {};
     package = {
       specVersion = "3.0";
-      identifier = { name = "eventuo11y-batteries"; version = "0.1.0.2"; };
+      identifier = { name = "eventuo11y-batteries"; version = "0.2.0.0"; };
       license = "Apache-2.0";
       copyright = "Copyright 2022 Shea Levy.";
       maintainer = "shea@shealevy.com";
@@ -34,7 +34,6 @@
       "library" = {
         depends = [
           (hsPkgs."aeson" or (errorHandler.buildDepError "aeson"))
-          (hsPkgs."async" or (errorHandler.buildDepError "async"))
           (hsPkgs."base" or (errorHandler.buildDepError "base"))
           (hsPkgs."binary" or (errorHandler.buildDepError "binary"))
           (hsPkgs."bytestring" or (errorHandler.buildDepError "bytestring"))
@@ -52,7 +51,6 @@
           (hsPkgs."servant-client-core" or (errorHandler.buildDepError "servant-client-core"))
           (hsPkgs."text" or (errorHandler.buildDepError "text"))
           (hsPkgs."transformers-base" or (errorHandler.buildDepError "transformers-base"))
-          (hsPkgs."unliftio-core" or (errorHandler.buildDepError "unliftio-core"))
           (hsPkgs."wai" or (errorHandler.buildDepError "wai"))
           (hsPkgs."warp" or (errorHandler.buildDepError "warp"))
           ];

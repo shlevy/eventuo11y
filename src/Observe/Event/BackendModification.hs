@@ -53,6 +53,12 @@ data EventBackendModifier r r' where
     -- | A 'Observe.Event.reference' to the parent t'Observe.Event.Event'.
     r ->
     EventBackendModifier r r
+  -- | Mark every causeless event as proximately caused by a known t'Observe.Event.Event'.
+  SetInitialCause ::
+    forall r.
+    -- | A 'Observe.Event.reference' to the causing t'Observe.Event.Event'.
+    r ->
+    EventBackendModifier r r
 
 -- | A sequence of 'EventBackendModifier's
 --
@@ -88,6 +94,28 @@ modifyEventBackend (Cons (SetAncestor parent) rest) backend' =
                 finalizeImpl,
               failImpl = \e -> do
                 runOnce parentAdded (addParentImpl parent)
+                failImpl e,
+              ..
+            },
+      newOnceFlag = newOnceFlag backend
+    }
+  where
+    backend = modifyEventBackend rest backend'
+modifyEventBackend (Cons (SetInitialCause proximate) rest) backend' =
+  EventBackend
+    { newEventImpl = \sel -> do
+        EventImpl {..} <- newEventImpl backend sel
+        proximateAdded <- newOnceFlag backend
+        pure $
+          EventImpl
+            { addProximateImpl = \r -> do
+                _ <- checkAndSet proximateAdded
+                addParentImpl r,
+              finalizeImpl = do
+                runOnce proximateAdded (addProximateImpl proximate)
+                finalizeImpl,
+              failImpl = \e -> do
+                runOnce proximateAdded (addProximateImpl proximate)
                 failImpl e,
               ..
             },

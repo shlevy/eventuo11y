@@ -81,6 +81,10 @@ renderRequestField (ResField res) = ("response-status" .= (statusCode $ response
 
 -- | A 'Network.Wai.Handler.Warp.setOnException' callback which creates an 'Event' rendering
 -- 'Exception's.
+--
+-- Ideally this would have a way to get a parent 'Event' from 'application'. Would be nice to
+-- use 'vault', but there doesn't seem to be a way to get at the 'Request' that Warp will pass
+-- here.
 onExceptionCallback :: EventBackend IO r OnException -> Maybe Request -> SomeException -> IO ()
 onExceptionCallback backend req e =
   if defaultShouldDisplayException e
