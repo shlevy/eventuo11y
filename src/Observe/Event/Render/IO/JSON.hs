@@ -112,7 +112,7 @@ jsonHandleBackend h renderEx renderSel = do
                           Nothing -> UnstructuredFail e
                     )
               },
-        newOnceFlag = newOnceFlagIO
+        newOnceFlag = newOnceFlagMVar
       }
 
 -- | An 'EventBackend' which posts events to @stderr@ as JSON.

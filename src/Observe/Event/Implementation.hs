@@ -20,13 +20,14 @@ module Observe.Event.Implementation
     runOnce,
     hoistOnceFlag,
     alwaysNewOnceFlag,
-    newOnceFlagIO,
+    newOnceFlagMVar,
   )
 where
 
-import Control.Concurrent.MVar
 import Control.Exception
+import Control.Monad.Primitive
 import Data.Functor
+import Data.Primitive.MVar
 
 -- | A backend for creating t'Observe.Event.Event's.
 --
@@ -110,9 +111,9 @@ runOnce f go =
     NewlySet -> go
     AlreadySet -> pure ()
 
--- | A 'OnceFlag' in 'IO' using an 'MVar'.
-newOnceFlagIO :: IO (OnceFlag IO)
-newOnceFlagIO = do
+-- | A 'OnceFlag' using an 'MVar'.
+newOnceFlagMVar :: (PrimMonad m) => m (OnceFlag m)
+newOnceFlagMVar = do
   flag <- newEmptyMVar
   pure $
     OnceFlag $

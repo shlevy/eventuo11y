@@ -1,6 +1,6 @@
 cabal-version:      3.0
 name:               eventuo11y
-version:            0.1.0.1
+version:            0.2.0.0
 synopsis:           An event-oriented observability library
 description:
   Instrument your Haskell codebase with wide, semantically meaningful events.
@@ -61,6 +61,7 @@ library
     , base           >=4.14      && <4.17
     , bytestring     >=0.10.12.0 && <0.12
     , exceptions     ^>=0.10.4
+    , primitive      ^>=0.7
     , resourcet      ^>=1.2.4.3
     , text           ^>=1.2.5.0
     , time           >=1.9.3     && <1.12
