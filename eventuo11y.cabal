@@ -23,7 +23,7 @@ description:
 
   See "Observe.Event" for detailed documentation on instrumenting your code.
 
-  See "Observe.Event.Implementation" for documentation on writing an
+  See "Observe.Event.Backend" for documentation on writing an
   @EventBackend@.
 
   See [Example.hs](https://github.com/shlevy/eventuo11y/tree/v0.1.0.1/Example.hs) for an example.
@@ -51,8 +51,9 @@ source-repository head
 library
   exposed-modules:
     Observe.Event
+    Observe.Event.Backend
+    Observe.Event.BackendModification
     Observe.Event.Dynamic
-    Observe.Event.Implementation
     Observe.Event.Render.IO.JSON
     Observe.Event.Render.JSON
 

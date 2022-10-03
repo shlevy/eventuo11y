@@ -29,7 +29,7 @@ import Data.Time.Clock
 import Data.UUID (UUID)
 import Data.UUID.V4
 import Observe.Event
-import Observe.Event.Implementation
+import Observe.Event.Backend
 import Observe.Event.Render.JSON
 import System.IO (Handle, stderr)
 

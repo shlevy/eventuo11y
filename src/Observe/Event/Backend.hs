@@ -1,5 +1,9 @@
+{-# LANGUAGE ApplicativeDo #-}
+{-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE RecordWildCards #-}
 
 -- |
 -- Description : Interface for implementing EventBackends
@@ -8,9 +12,14 @@
 -- Maintainer  : shea@shealevy.com
 --
 -- This is the primary module needed to write new 'EventBackend's.
-module Observe.Event.Implementation
+module Observe.Event.Backend
   ( EventBackend (..),
     EventImpl (..),
+    unitEventBackend,
+    pairEventBackend,
+    hoistEventBackend,
+    narrowEventBackend,
+    narrowEventBackend',
 
     -- * OnceFlags
 
@@ -82,6 +91,121 @@ data EventImpl m r f = EventImpl
     finalizeImpl :: !(m ()),
     failImpl :: !(Maybe SomeException -> m ())
   }
+
+-- | A no-op 'EventBackend'.
+--
+-- This can be used if calling instrumented code from an un-instrumented
+-- context, or to purposefully ignore instrumentation from some call.
+--
+-- 'unitEventBackend' is the algebraic unit of 'pairEventBackend'.
+unitEventBackend :: Applicative m => EventBackend m () s
+unitEventBackend =
+  EventBackend
+    { newEventImpl = \_ ->
+        pure $
+          EventImpl
+            { referenceImpl = (),
+              addFieldImpl = const $ pure (),
+              addParentImpl = const $ pure (),
+              addProximateImpl = const $ pure (),
+              finalizeImpl = pure (),
+              failImpl = const $ pure ()
+            },
+      newOnceFlag = pure alwaysNewOnceFlag
+    }
+
+-- | An 'EventBackend' which sequentially generates 'Event's in the two given 'EventBackend's.
+--
+-- This can be used to emit instrumentation in multiple ways (e.g. logs to grafana and metrics on
+-- a prometheus HTML page).
+pairEventBackend :: Applicative m => EventBackend m a s -> EventBackend m b s -> EventBackend m (a, b) s
+pairEventBackend x y =
+  EventBackend
+    { newEventImpl = \sel -> do
+        xImpl <- newEventImpl x sel
+        yImpl <- newEventImpl y sel
+        pure $
+          EventImpl
+            { referenceImpl = (referenceImpl xImpl, referenceImpl yImpl),
+              addFieldImpl = \f -> addFieldImpl xImpl f *> addFieldImpl yImpl f,
+              addParentImpl = \(px, py) -> addParentImpl xImpl px *> addParentImpl yImpl py,
+              addProximateImpl = \(px, py) -> addProximateImpl xImpl px *> addProximateImpl yImpl py,
+              finalizeImpl = finalizeImpl xImpl *> finalizeImpl yImpl,
+              failImpl = \e -> failImpl xImpl e *> failImpl yImpl e
+            },
+      newOnceFlag = do
+        xOnce <- newOnceFlag x
+        yOnce <- newOnceFlag y
+        pure $
+          OnceFlag $ do
+            xSet <- checkAndSet xOnce
+            ySet <- checkAndSet yOnce
+            pure $ case (xSet, ySet) of
+              (NewlySet, NewlySet) -> NewlySet
+              _ -> AlreadySet
+    }
+
+-- | Hoist an 'EventBackend' along a given natural transformation into a new monad.
+hoistEventBackend ::
+  (Functor m, Functor n) =>
+  -- | Natural transformation from @m@ to @n@.
+  (forall x. m x -> n x) ->
+  EventBackend m r s ->
+  EventBackend n r s
+hoistEventBackend nt backend =
+  EventBackend
+    { newEventImpl = nt . fmap hoistEventImpl . newEventImpl backend,
+      newOnceFlag = hoistOnceFlag nt <$> (nt $ newOnceFlag backend)
+    }
+  where
+    hoistEventImpl (EventImpl {..}) =
+      EventImpl
+        { referenceImpl,
+          addFieldImpl = nt . addFieldImpl,
+          addParentImpl = nt . addParentImpl,
+          addProximateImpl = nt . addProximateImpl,
+          finalizeImpl = nt $ finalizeImpl,
+          failImpl = nt . failImpl
+        }
+
+-- | Narrow an 'EventBackend' to a new selector type via a given injection function.
+--
+-- A typical usage, where component A calls component B, would be to have A's selector
+-- type have a constructor to take any value of B's selector type (and preserve the field)
+-- and then call 'narrowEventBackend' with that constructor when invoking functions in B.
+--
+-- See 'narrowEventBackend'' for a more general, if unweildy, variant.
+narrowEventBackend ::
+  (Functor m) =>
+  -- | Inject a narrow selector into the wider selector type.
+  (forall f. s f -> t f) ->
+  EventBackend m r t ->
+  EventBackend m r s
+narrowEventBackend inj =
+  narrowEventBackend'
+    (\sel withInjField -> withInjField (inj sel) id)
+
+-- | Narrow an 'EventBackend' to a new selector type via a given injection function.
+--
+-- See 'narrowEventBackend' for a simpler, if less general, variant.
+narrowEventBackend' ::
+  (Functor m) =>
+  -- | Simultaneously inject a narrow selector into the wider selector type
+  -- and the narrow selector's field into the wider selector's field type.
+  (forall f. s f -> forall a. (forall g. t g -> (f -> g) -> a) -> a) ->
+  EventBackend m r t ->
+  EventBackend m r s
+narrowEventBackend' inj backend =
+  EventBackend
+    { newEventImpl = \sel -> inj sel \sel' injField ->
+        newEventImpl backend sel' <&> \case
+          EventImpl {..} ->
+            EventImpl
+              { addFieldImpl = addFieldImpl . injField,
+                ..
+              },
+      newOnceFlag = newOnceFlag backend
+    }
 
 -- | The state of a 'OnceFlag'
 data FlagState
