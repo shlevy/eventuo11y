@@ -38,15 +38,17 @@
 -- that appears in the type of our capabilities and ensure it's liftable to both our application monad and the
 -- capability's base instantiation.
 module Observe.Event.BackendModification
-  ( EventBackendModifier(..)
-  , EventBackendModifiers
-  , modifyEventBackend
-  , -- * Simple EventBackendModifiers
-    unmodified
-  , silence
-  , setAncestor
-  , setInitialCause
-  ) where
+  ( EventBackendModifier (..),
+    EventBackendModifiers,
+    modifyEventBackend,
+
+    -- * Simple EventBackendModifiers
+    unmodified,
+    silence,
+    setAncestor,
+    setInitialCause,
+  )
+where
 
 import Control.Category
 import Observe.Event.Backend
