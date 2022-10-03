@@ -322,4 +322,4 @@ subEventBackend ::
   -- | The parent event.
   Event m r s f ->
   EventBackend m r s
-subEventBackend Event {..} = modifyEventBackend (Cons (SetAncestor $ referenceImpl impl) Nil) backend
+subEventBackend Event {..} = modifyEventBackend (setAncestor $ referenceImpl impl) backend

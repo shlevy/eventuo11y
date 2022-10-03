@@ -1,5 +1,9 @@
 # Revision history for eventuo11y-batteries
 
+## 0.2.0.2 -- 2022-10-03
+
+eventuo11y bump
+
 ## 0.2.0.1 -- 2022-10-03
 
 Relax text upper and lower bounds

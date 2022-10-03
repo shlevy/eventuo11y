@@ -37,11 +37,20 @@
 -- or @MonadBaseControl@ if we share a base monad, or if we implemented t'Observe.Event.EventBackend's in a separate base monad
 -- that appears in the type of our capabilities and ensure it's liftable to both our application monad and the
 -- capability's base instantiation.
-module Observe.Event.BackendModification where
+module Observe.Event.BackendModification
+  ( EventBackendModifier(..)
+  , EventBackendModifiers
+  , modifyEventBackend
+  , -- * Simple EventBackendModifiers
+    unmodified
+  , silence
+  , setAncestor
+  , setInitialCause
+  ) where
 
 import Control.Category
 import Observe.Event.Backend
-import Prelude hiding ((.))
+import Prelude hiding (id, (.))
 
 -- | Modify an t'Observe.Event.EventBackend', chaging its reference type from @r@ to @r'@
 data EventBackendModifier r r' where
@@ -123,3 +132,25 @@ modifyEventBackend (Cons (SetInitialCause proximate) rest) backend' =
     }
   where
     backend = modifyEventBackend rest backend'
+
+-- | A single-element 'EventBackendModifiers'
+singleton :: EventBackendModifier r r' -> EventBackendModifiers r r'
+singleton = flip Cons Nil
+
+-- | An 'EventBackendModifiers' that does nothing.
+unmodified :: EventBackendModifiers r r
+unmodified = id
+
+-- | An 'EventBackendModifiers' that silences events.
+silence :: EventBackendModifiers r ()
+silence = singleton Silence
+
+-- | An 'EventBackendModifiers' that marks every parentless event as the child
+-- of a known t'Observe.Event.Event'.
+setAncestor :: r -> EventBackendModifiers r r
+setAncestor = singleton . SetAncestor
+
+-- | An 'EventBackendModifiers' that marks every causeless event as proximately caused
+-- by a known t'Observe.Event.Event'.
+setInitialCause :: r -> EventBackendModifiers r r
+setInitialCause = singleton . SetInitialCause

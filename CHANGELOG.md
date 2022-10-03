@@ -1,5 +1,9 @@
 # Revision history for eventuo11y
 
+## 0.3.0.0 -- 2022-10-03
+
+Add single-modifier exports from BackendModification
+
 ## 0.2.0.0 -- 2022-10-03
 
 Relax text upper and lower bounds
