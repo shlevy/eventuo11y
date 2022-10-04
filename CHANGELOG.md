@@ -1,9 +1,5 @@
 # Revision history for eventuo11y
 
-## 0.4.0.0 -- 2022-10-04
-
-Have SomeJSONException take a RenderExJSON directly
-
 ## 0.3.0.0 -- 2022-10-03
 
 Add single-modifier exports from BackendModification

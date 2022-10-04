@@ -1,9 +1,5 @@
 # Revision history for eventuo11y-batteries
 
-## 0.2.0.3 -- 2022-10-04
-
-eventuo11y bump
-
 ## 0.2.0.2 -- 2022-10-03
 
 eventuo11y bump

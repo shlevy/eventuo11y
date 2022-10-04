@@ -15,7 +15,7 @@ import Data.ByteString.Internal
 import Data.Void
 import Foreign.C.Error
 import Foreign.C.Types
-import Foreign.ForeignPtr
+import Foreign.ForeignPtr.Safe
 import Foreign.Ptr
 import GHC.Generics
 import Observe.Event
@@ -99,7 +99,7 @@ data BadOpen = BadOpen
 
 -- Our exception is beneath SomeJSONException in the hierarchy
 instance Exception BadOpen where
-  toException = jsonExceptionToException toJSON
+  toException = jsonExceptionToException
   fromException = jsonExceptionFromException
 
 -- end module File
