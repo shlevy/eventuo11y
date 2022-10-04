@@ -58,6 +58,7 @@ module Observe.Event
     -- * 'EventBackend's
     EventBackend,
     subEventBackend,
+    causedEventBackend,
     unitEventBackend,
     pairEventBackend,
     hoistEventBackend,
@@ -323,3 +324,12 @@ subEventBackend ::
   Event m r s f ->
   EventBackend m r s
 subEventBackend Event {..} = modifyEventBackend (setAncestor $ referenceImpl impl) backend
+
+-- | An 'EventBackend' where every otherwise causeless event will be marked
+-- as caused by the given 'Event'.
+causedEventBackend ::
+  (Monad m) =>
+  -- | The parent event.
+  Event m r s f ->
+  EventBackend m r s
+causedEventBackend Event {..} = modifyEventBackend (setInitialCause $ referenceImpl impl) backend
