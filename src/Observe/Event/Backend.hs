@@ -18,6 +18,7 @@ module Observe.Event.Backend
     unitEventBackend,
     pairEventBackend,
     hoistEventBackend,
+    hoistEventImpl,
     narrowEventBackend,
     narrowEventBackend',
 
@@ -154,19 +155,21 @@ hoistEventBackend ::
   EventBackend n r s
 hoistEventBackend nt backend =
   EventBackend
-    { newEventImpl = nt . fmap hoistEventImpl . newEventImpl backend,
+    { newEventImpl = nt . fmap (hoistEventImpl nt) . newEventImpl backend,
       newOnceFlag = hoistOnceFlag nt <$> (nt $ newOnceFlag backend)
     }
-  where
-    hoistEventImpl (EventImpl {..}) =
-      EventImpl
-        { referenceImpl,
-          addFieldImpl = nt . addFieldImpl,
-          addParentImpl = nt . addParentImpl,
-          addProximateImpl = nt . addProximateImpl,
-          finalizeImpl = nt $ finalizeImpl,
-          failImpl = nt . failImpl
-        }
+
+-- | Hoist an 'EventImpl' along a given natural transformation into a new monad.
+hoistEventImpl :: (forall x. m x -> n x) -> EventImpl m r f -> EventImpl n r f
+hoistEventImpl nt (EventImpl {..}) =
+  EventImpl
+    { referenceImpl,
+      addFieldImpl = nt . addFieldImpl,
+      addParentImpl = nt . addParentImpl,
+      addProximateImpl = nt . addProximateImpl,
+      finalizeImpl = nt finalizeImpl,
+      failImpl = nt . failImpl
+    }
 
 -- | Narrow an 'EventBackend' to a new selector type via a given injection function.
 --

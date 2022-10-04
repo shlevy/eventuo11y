@@ -1,5 +1,9 @@
 # Revision history for eventuo11y
 
+## 0.3.2.0 -- 2022-10-04
+
+Add hoistEvent
+
 ## 0.3.1.0 -- 2022-10-04
 
 Add causedEventBackend

@@ -40,6 +40,7 @@
 --  t'Observe.Event.Render.JSON.RenderFieldJSON' to use JSON rendering 'EventBackend's.
 module Observe.Event
   ( Event,
+    hoistEvent,
 
     -- * Event manipulation #eventmanip#
     reference,
@@ -104,6 +105,15 @@ data Event m r s f = Event
     -- | A 'OnceFlag' to ensure we only finish ('finalize' or 'failEvent') once.
     finishFlag :: !(OnceFlag m)
   }
+
+-- | Hoist an 'Event' along a given natural transformation into a new monad.
+hoistEvent :: (Functor m, Functor n) => (forall x. m x -> n x) -> Event m r s f -> Event n r s f
+hoistEvent nt Event {..} =
+  Event
+    { backend = hoistEventBackend nt backend,
+      impl = hoistEventImpl nt impl,
+      finishFlag = hoistOnceFlag nt finishFlag
+    }
 
 -- | Obtain a reference to an 'Event'.
 --
