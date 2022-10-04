@@ -64,27 +64,28 @@ renderDynamicFieldJSON f = (fromText (name f), value f)
 -- structured exceptions in a JSON backend, so long as you provide a
 -- 'RenderExJSON' for your base exception type.
 renderJSONException :: RenderExJSON SomeJSONException
-renderJSONException (SomeJSONException e) = toJSON e
+renderJSONException (SomeJSONException render e) = render e
 
 -- | A possible base type for structured exceptions renderable to JSON.
 --
 -- It is __not__ necessary to use 'SomeJSONException' for the base of your
 -- structured exceptions in a JSON backend, so long as you provide a
 -- 'RenderExJSON' for your base exception type.
-data SomeJSONException = forall e. (Exception e, ToJSON e) => SomeJSONException e
+data SomeJSONException
+  = forall e. Exception e => SomeJSONException (RenderExJSON e) e
 
 instance Show SomeJSONException where
-  show (SomeJSONException e) = show e
-  showsPrec i (SomeJSONException e) = showsPrec i e
+  show (SomeJSONException _ e) = show e
+  showsPrec i (SomeJSONException _ e) = showsPrec i e
 
 instance Exception SomeJSONException
 
 -- | Used to create sub-classes of 'SomeJSONException'.
-jsonExceptionToException :: (Exception e, ToJSON e) => e -> SomeException
-jsonExceptionToException = toException . SomeJSONException
+jsonExceptionToException :: (Exception e) => RenderExJSON e -> e -> SomeException
+jsonExceptionToException render = toException . SomeJSONException render
 
 -- | Used to create sub-classes of 'SomeJSONException'.
 jsonExceptionFromException :: (Exception e) => SomeException -> Maybe e
 jsonExceptionFromException x = do
-  SomeJSONException a <- fromException x
+  SomeJSONException _ a <- fromException x
   cast a

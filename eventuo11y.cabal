@@ -1,6 +1,6 @@
 cabal-version:      3.0
 name:               eventuo11y
-version:            0.3.0.0
+version:            0.4.0.0
 synopsis:           An event-oriented observability library
 description:
   Instrument your Haskell codebase with wide, semantically meaningful events.
@@ -26,7 +26,7 @@ description:
   See "Observe.Event.Backend" for documentation on writing an
   @EventBackend@.
 
-  See [Example.hs](https://github.com/shlevy/eventuo11y/tree/v0.3.0.0/Example.hs) for an example.
+  See [Example.hs](https://github.com/shlevy/eventuo11y/tree/v0.4.0.0/Example.hs) for an example.
 
   See [eventuo11y-batteries](https://hackage.haskell.org/package/eventuo11y-batteries) for miscellaneous
   framework-specific helpers.
@@ -58,7 +58,7 @@ library
     Observe.Event.Render.JSON
 
   build-depends:
-    , aeson          ^>=2.0.2.0
+    , aeson          ^>=2.0
     , base           >=4.14    && <4.17
     , bytestring     >=0.10    && <0.12
     , exceptions     ^>=0.10
