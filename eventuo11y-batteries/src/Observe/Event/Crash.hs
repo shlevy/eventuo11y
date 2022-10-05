@@ -18,7 +18,7 @@
 -- after all open requests have been serviced.
 module Observe.Event.Crash
   ( withScheduleCrash,
-    ScheduleCrash,
+    ScheduleCrash (..),
     DoCrash,
     hoistScheduleCrash,
 
@@ -48,7 +48,10 @@ withScheduleCrash backend crash go =
      in withEvent backend' Crashing $ const crash
 
 -- | Function to schedule an application crash.
-newtype ScheduleCrash m r = ScheduleCrash {schedule :: forall r'. EventBackendModifiers r r' -> m ()}
+newtype ScheduleCrash m r = ScheduleCrash
+  { -- | Schedule a crash
+    schedule :: forall r'. EventBackendModifiers r r' -> m ()
+  }
 
 -- | Function to actually initiate the crash.
 type DoCrash m = m ()
