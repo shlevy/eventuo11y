@@ -44,7 +44,7 @@
         "vector".flags.boundschecks = true;
         "vector".flags.unsafechecks = false;
         "http-types".revision = (((hackage."http-types")."0.12.3").revisions).default;
-        "some".revision = (((hackage."some")."1.0.4").revisions).default;
+        "some".revision = (((hackage."some")."1.0.4.1").revisions).default;
         "some".flags.newtype-unsafe = true;
         "comonad".revision = (((hackage."comonad")."5.0.8").revisions).default;
         "comonad".flags.containers = true;

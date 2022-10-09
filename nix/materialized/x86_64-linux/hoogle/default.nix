@@ -173,7 +173,7 @@
         "cereal".revision = (((hackage."cereal")."0.5.8.3").revisions).default;
         "cereal".flags.bytestring-builder = false;
         "utf8-string".revision = (((hackage."utf8-string")."1.0.2").revisions).default;
-        "conduit".revision = (((hackage."conduit")."1.3.4.2").revisions).default;
+        "conduit".revision = (((hackage."conduit")."1.3.4.3").revisions).default;
         "data-default-class".revision = (((hackage."data-default-class")."0.1.2.0").revisions).default;
         "vector-algorithms".revision = (((hackage."vector-algorithms")."0.9.0.1").revisions).default;
         "vector-algorithms".flags.internalchecks = false;
