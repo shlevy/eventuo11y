@@ -277,6 +277,7 @@
       packages = {
         eventuo11y = ./.plan.nix/eventuo11y.nix;
         eventuo11y-batteries = ./.plan.nix/eventuo11y-batteries.nix;
+        eventuo11y-dsl = ./.plan.nix/eventuo11y-dsl.nix;
         };
       };
   modules = [
@@ -285,6 +286,7 @@
         packages = {
           "eventuo11y" = { flags = {}; };
           "eventuo11y-batteries" = { flags = {}; };
+          "eventuo11y-dsl" = { flags = {}; };
           };
         })
     ({ lib, ... }:
@@ -369,6 +371,7 @@
           "constraints".components.library.planned = lib.mkOverride 900 true;
           "indexed-traversable".components.library.planned = lib.mkOverride 900 true;
           "network-uri".components.library.planned = lib.mkOverride 900 true;
+          "eventuo11y-dsl".components.library.planned = lib.mkOverride 900 true;
           "memory".components.library.planned = lib.mkOverride 900 true;
           "pem".components.library.planned = lib.mkOverride 900 true;
           "base-compat-batteries".components.library.planned = lib.mkOverride 900 true;

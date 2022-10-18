@@ -1,4 +1,6 @@
 dist-newstyle
 *.hi
+*.dyn_hi
 *.o
+*.dyn_o
 Example
