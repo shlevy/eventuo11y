@@ -1,5 +1,6 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 
 -- |
 -- Description : "Dynamically typed" Event selectors and fields.
@@ -23,6 +24,7 @@ import Data.Aeson
 import Data.String
 import Data.Text
 import Observe.Event
+import Observe.Event.Syntax
 
 -- | A simple type usable as an 'EventBackend' selector.
 --
@@ -41,18 +43,16 @@ instance (f ~ DynamicField) => IsString (DynamicEventSelector f) where
 -- | A simple type usable as an 'Event' field type.
 --
 -- Individual 'DynamicField's are typically constructed via
--- the 'IsString' instance, using 'ToJSON' for the value,
--- e.g. @addField ev $ "foo" x@ will add @DynamicField "foo" (toJSON x)@
+-- the 'RecordField' instance, using 'ToJSON' for the value,
+-- e.g. @addField ev $ "foo" ≔ x@ will add @DynamicField "foo" (toJSON x)@
 -- as a field to @ev@.
 data DynamicField = DynamicField
   { name :: !Text,
     value :: !Value
   }
 
--- | Treat a string as a function to a 'DynamicField', calling
--- 'toJSON' on its argument.
-instance (ToJSON x) => IsString (x -> DynamicField) where
-  fromString s = DynamicField (fromString s) . toJSON
+instance (ToJSON a) => RecordField Text a DynamicField where
+  k ≔ v = DynamicField k $ toJSON v
 
 -- | Shorthand for an 'EventBackend' using 'DynamicEventSelector's.
 type DynamicEventBackend m r = EventBackend m r DynamicEventSelector

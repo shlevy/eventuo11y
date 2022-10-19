@@ -2,8 +2,10 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE OverloadedLists #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 
 module Main where
@@ -15,12 +17,14 @@ import Data.ByteString.Internal
 import Data.Void
 import Foreign.C.Error
 import Foreign.C.Types
-import Foreign.ForeignPtr.Safe
+import Foreign.ForeignPtr
 import Foreign.Ptr
 import GHC.Generics
 import Observe.Event
-import Observe.Event.Render.IO.JSON
+import Observe.Event.DSL
 import Observe.Event.Render.JSON
+import Observe.Event.Render.JSON.DSL.Compile
+import Observe.Event.Render.JSON.Handle
 import System.FilePath
 import System.IO.Temp
 import System.Posix.Files
@@ -28,6 +32,42 @@ import System.Posix.IO
 import System.Posix.Types
 
 -- Pretend this is in a separate module File where
+
+deriving instance Show Errno
+
+deriving instance ToJSON Errno
+
+deriving instance Generic Errno
+
+deriving instance ToJSON CInt
+
+deriving instance Generic CInt
+
+deriving instance ToJSON Fd
+
+deriving instance Generic Fd
+
+deriving instance ToJSON ByteCount
+
+deriving instance Generic ByteCount
+
+-- Define our selector type and give it instances to render as JSON
+compile $
+  SelectorSpec
+    "file" -- Creates a type FileSelector
+    [ ["open", "file"] -- Creates a constructor OpenFile :: FileSelector OpenField
+        ≔ FieldSpec
+          "open" -- Creates a type OpenField
+          [ "filename" ≔ ''FilePath, -- creates a constructor Filename :: !FilePath -> OpenField
+            ["file", "fd"] ≔ ''Fd -- creates a constructor FileFd :: !Fd -> OpenField
+          ],
+      "write"
+        ≔ FieldSpec
+          "write"
+          [ ["bytes", "asked"] ≔ ''ByteCount,
+            ["bytes", "actual"] ≔ ''ByteCount
+          ]
+    ]
 
 -- We take an EventBackend, polymorphic in r, supporting our domain-specific selector type
 writeToFile :: EventBackend IO r FileSelector -> FilePath -> ByteString -> IO ()
@@ -50,7 +90,7 @@ writeToFile backend path bs = do
     let bcSz = fromIntegral sz
         go :: ByteCount -> IO ()
         go offset = do
-          newOffset <- withEvent backend WriteFile $ \ev -> do
+          newOffset <- withEvent backend Write $ \ev -> do
             let ct = bcSz - offset
             addField ev $ BytesAsked ct
             written <- fdWriteBuf fd (plusPtr ptr (base_off + fromIntegral offset)) ct
@@ -61,34 +101,6 @@ writeToFile backend path bs = do
     go 0
   closeFd fd
   pure ()
-
--- Define our selector type. A GADT, parameterized by field type
-data FileSelector f where
-  OpenFile :: FileSelector OpenField
-  WriteFile :: FileSelector WriteField
-
--- Define a renderer for our selector type
-renderFileSelector :: RenderSelectorJSON FileSelector
-renderFileSelector OpenFile = ("open-file", renderOpenField) -- Expressed in terms of renderers for our field tyeps
-renderFileSelector WriteFile = ("write-file", renderWriteField)
-
--- Define a field type
-data OpenField
-  = Filename !FilePath
-  | FileFd !Fd
-
--- Define a renderer for a field type
-renderOpenField :: RenderFieldJSON OpenField
-renderOpenField (Filename path) = ("file-name", toJSON path)
-renderOpenField (FileFd fd) = ("file-fd", toJSON fd)
-
-data WriteField
-  = BytesAsked !ByteCount
-  | BytesActual !ByteCount
-
-renderWriteField :: RenderFieldJSON WriteField
-renderWriteField (BytesAsked ct) = ("asked", toJSON ct)
-renderWriteField (BytesActual ct) = ("actual", toJSON ct)
 
 -- Define a new exception that can be used with simpleJsonStderrBackend
 data BadOpen = BadOpen
@@ -104,6 +116,13 @@ instance Exception BadOpen where
 
 -- end module File
 
+compile $
+  SelectorSpec
+    "main"
+    [ ["using", "temp", "dir"] ≔ ''FilePath, -- Creates a constructor UsingTempDir :: MainSelector FilePath
+      "writing" ≔ Inject ''FileSelector -- Creates a constructor Writing :: FileSelector x -> MainSelector x
+    ]
+
 -- Note a different selector type than writeToFile
 instrumentedMain :: EventBackend IO r MainSelector -> IO ()
 instrumentedMain backend = do
@@ -113,38 +132,11 @@ instrumentedMain backend = do
       let -- Create a new EventBackend where all parentless events are made children of our current event
           subBackend = subEventBackend ev
           -- Narrow subBackend to create events from FileSelectors instead of MainSelectors
-          narrowerBackend = narrowEventBackend InjectFileSelector subBackend
+          narrowerBackend = narrowEventBackend Writing subBackend
       -- Pass our narrower backend to writeToFile
       writeToFile narrowerBackend (dir </> "example.txt") "example"
 
 main :: IO ()
 main =
   -- Initialize a backend to write JSON to stderr and use it.
-  simpleJsonStderrBackend renderMainSelector >>= instrumentedMain
-
--- Instrumentation definitions
-data MainSelector f where
-  UsingTempDir :: MainSelector FilePath
-  InjectFileSelector :: FileSelector a -> MainSelector a -- A typical pattern together with narrowEventBackend to call functions with a more specialized selector type
-
-renderMainSelector :: RenderSelectorJSON MainSelector
-renderMainSelector UsingTempDir = ("using-tmp-dir", \f -> ("path", toJSON f))
-renderMainSelector (InjectFileSelector filesel) = renderFileSelector filesel -- Note that we reuse the selector renderer from our File "module"
-
-deriving instance Show Errno
-
-deriving instance ToJSON Errno
-
-deriving instance Generic Errno
-
-deriving instance ToJSON CInt
-
-deriving instance Generic CInt
-
-deriving instance ToJSON Fd
-
-deriving instance Generic Fd
-
-deriving instance ToJSON ByteCount
-
-deriving instance Generic ByteCount
+  simpleJsonStderrBackend defaultRenderSelectorJSON >>= instrumentedMain

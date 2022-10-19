@@ -278,6 +278,7 @@
         eventuo11y = ./.plan.nix/eventuo11y.nix;
         eventuo11y-batteries = ./.plan.nix/eventuo11y-batteries.nix;
         eventuo11y-dsl = ./.plan.nix/eventuo11y-dsl.nix;
+        eventuo11y-json = ./.plan.nix/eventuo11y-json.nix;
         };
       };
   modules = [
@@ -287,6 +288,7 @@
           "eventuo11y" = { flags = {}; };
           "eventuo11y-batteries" = { flags = {}; };
           "eventuo11y-dsl" = { flags = {}; };
+          "eventuo11y-json" = { flags = {}; };
           };
         })
     ({ lib, ... }:
@@ -328,6 +330,7 @@
           "array".components.library.planned = lib.mkOverride 900 true;
           "x509".components.library.planned = lib.mkOverride 900 true;
           "servant-client-core".components.library.planned = lib.mkOverride 900 true;
+          "eventuo11y-json".components.library.planned = lib.mkOverride 900 true;
           "binary".components.library.planned = lib.mkOverride 900 true;
           "ghc-boot-th".components.library.planned = lib.mkOverride 900 true;
           "scientific".components.library.planned = lib.mkOverride 900 true;

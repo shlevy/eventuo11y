@@ -1,5 +1,9 @@
 # Revision history for eventuo11y
 
+## 0.5.0.0 -- 2022-10-23
+
+Break out eventuo11y-json
+
 ## 0.3.2.0 -- 2022-10-04
 
 Add hoistEvent

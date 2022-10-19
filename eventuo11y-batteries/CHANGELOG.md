@@ -1,5 +1,9 @@
 # Revision history for eventuo11y-batteries
 
+## 0.2.1.0 -- 2022-10-23
+
+Update for eventu11y 0.5.0.0
+
 ## 0.2.1.0 -- 2022-10-04
 
 Fixing missing scheduleCrash export

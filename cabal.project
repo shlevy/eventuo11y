@@ -1,9 +1,18 @@
 index-state: 2022-10-15T00:00:00Z
 packages:
-  . eventuo11y-dsl eventuo11y-batteries
+  .
+  eventuo11y-batteries
+  eventuo11y-dsl
+  eventuo11y-json
 
 package eventuo11y
   ghc-options: -Wall
 
 package eventuo11y-batteries
+  ghc-options: -Wall
+
+package eventuo11y-dsl
+  ghc-options: -Wall
+
+package eventuo11y-json
   ghc-options: -Wall

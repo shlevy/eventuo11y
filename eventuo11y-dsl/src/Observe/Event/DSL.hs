@@ -43,6 +43,7 @@ module Observe.Event.DSL
     lowerCamel,
     kebab,
     NonEmptyString ((:|:)),
+    nonEmptyToString,
   )
 where
 
@@ -54,6 +55,7 @@ import Data.String
 import GHC.Exts
 import Language.Haskell.TH
 import Language.Haskell.TH.Syntax.Compat as THC
+import Observe.Event.Syntax
 
 -- | A specification for an 'Observe.Event.Event' selector type
 data SelectorSpec
@@ -121,16 +123,6 @@ data FieldConstructorSpec
       !(NonEmpty AnyType)
       -- ^ The types of the arguments to the constructor.
 
--- | A type class for common syntax for types that are key-value-like.
---
--- For example, the appropriate 'RecordField' instances allow for
--- @[ "bytes", "asked" ] ≔ ''ByteCount@ and @[ "bytes", "actual" ] ≔ [t|Maybe ByteCount|]@
--- to both construct 'FieldConstructorSpec's, the former creating a constructor @BytesAsked@
--- taking a 'System.Posix.Types.ByteCount' and the latter a constructor @BytesActual@ taking
--- a 'Maybe' 'System.Posix.Types.ByteCount'.
-class RecordField k v a where
-  (≔) :: k -> v -> a
-
 -- | e.g. @"foo" ≔ NoFields@
 instance (a ~ ExplodedName) => RecordField a SelectorField SelectorConstructorSpec where
   (≔) = SelectorConstructorSpec
@@ -150,12 +142,6 @@ instance (a ~ ExplodedName) => RecordField a Name SelectorConstructorSpec where
 -- | e.g. @"foo" ≔ [t|Int] :| [ [t|Bool], [t|Char] ]@
 instance (a ~ ExplodedName, m ~ AnyQuote) => RecordField a (NonEmpty (m Type)) FieldConstructorSpec where
   (≔) = FieldConstructorSpec
-
--- | List must be non-empty.
---
--- e.g. @"foo" ≔ [ [t|Int], [t|Bool], [t|Char] ]@
-instance (a ~ ExplodedName, m ~ AnyQuote) => RecordField a [m Type] FieldConstructorSpec where
-  k ≔ v = k ≔ fromList @(NonEmpty _) v
 
 -- | e.g. @"foo" ≔ [t|Maybe Int]@
 instance (a ~ ExplodedName, m ~ AnyQuote) => RecordField a (m Type) FieldConstructorSpec where
@@ -234,6 +220,7 @@ instance IsList NonEmptyString where
 
 {-# COMPLETE (:|:) #-}
 
+pattern (:|:) :: Char -> String -> NonEmptyString
 pattern (:|:) hd tl <- NonEmptyString (hd :| tl)
 
 -- | Must be non-empty

@@ -38,7 +38,11 @@
           (hsPkgs."th-compat" or (errorHandler.buildDepError "th-compat"))
           ];
         buildable = true;
-        modules = [ "Observe/Event/DSL" "Observe/Event/DSL/Compile" ];
+        modules = [
+          "Observe/Event/DSL"
+          "Observe/Event/DSL/Compile"
+          "Observe/Event/Syntax"
+          ];
         hsSourceDirs = [ "src" ];
         };
       };

@@ -3,13 +3,14 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE TypeApplications #-}
 
 -- |
 -- Description : EventBackend for rendering events as JSON to a handle
 -- Copyright   : Copyright 2022 Shea Levy.
 -- License     : Apache-2.0
 -- Maintainer  : shea@shealevy.com
-module Observe.Event.Render.IO.JSON
+module Observe.Event.Render.JSON.Handle
   ( jsonHandleBackend,
     simpleJsonStderrBackend,
 
@@ -126,7 +127,7 @@ jsonHandleBackend h renderEx renderSel = do
 -- The 'EventBackend' must be the exclusive writer to @stderr@ while any events are live,
 -- but it does not 'System.IO.hClose' it itself.
 simpleJsonStderrBackend :: RenderSelectorJSON s -> IO (EventBackend IO JSONRef s)
-simpleJsonStderrBackend = jsonHandleBackend stderr renderJSONException
+simpleJsonStderrBackend = jsonHandleBackend stderr (toJSON @SomeJSONException)
 
 -- | Why did an 'Event' finish?
 data FinishReason stex

@@ -1,5 +1,6 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE RecordWildCards #-}
 
 -- |
 -- Description : Renderers for serializing Events as JSON
@@ -7,25 +8,25 @@
 -- License     : Apache-2.0
 -- Maintainer  : shea@shealevy.com
 --
--- Instrumentors will need to provide instances of 'RenderSelectorJSON'
--- and 'RenderFieldJSON' for their domain-specific types to use their
---  t'Observe.Event.Event's with JSON-consuming t'Observe.Event.EventBackend's.
+-- Rendering types for JSON-consuming 'Observe.Event.EventBackend's.
+--
+-- Instances of 'RenderSelectorJSON' and 'RenderFieldJSON' can be generated
+-- by "Observe.Event.Render.JSON.DSL.Compile".
 module Observe.Event.Render.JSON
   ( RenderSelectorJSON,
     RenderFieldJSON,
+
+    -- * Default renderers
+    DefaultRenderSelectorJSON (..),
+    DefaultRenderFieldJSON (..),
 
     -- * Rendering structured exceptions
     RenderExJSON,
 
     -- ** SomeJSONException
-    renderJSONException,
     SomeJSONException (..),
     jsonExceptionToException,
     jsonExceptionFromException,
-
-    -- * Observe.Event.Dynamic support
-    renderDynamicEventSelectorJSON,
-    renderDynamicFieldJSON,
   )
 where
 
@@ -33,9 +34,10 @@ import Control.Exception
 import Data.Aeson
 import Data.Aeson.Key
 import Data.Typeable
+import Data.Void
 import Observe.Event.Dynamic
 
--- | A function to render a given selector, its fields, as JSON.
+-- | A function to render a given selector, and its fields, as JSON.
 --
 -- The 'Key' is the event name/category.
 type RenderSelectorJSON sel = forall f. sel f -> (Key, RenderFieldJSON f)
@@ -46,36 +48,42 @@ type RenderSelectorJSON sel = forall f. sel f -> (Key, RenderFieldJSON f)
 -- rendering of the field value (if any).
 type RenderFieldJSON field = field -> (Key, Value)
 
+-- | A default 'RenderSelectorJSON', useful for auto-generation and simple
+-- backend invocation.
+class DefaultRenderSelectorJSON sel where
+  defaultRenderSelectorJSON :: RenderSelectorJSON sel
+
+-- | A default 'RenderFieldJSON', useful for auto-generation and simple
+-- backend invocation.
+class DefaultRenderFieldJSON field where
+  defaultRenderFieldJSON :: RenderFieldJSON field
+
+instance DefaultRenderFieldJSON Void where
+  defaultRenderFieldJSON = absurd
+
+instance DefaultRenderSelectorJSON DynamicEventSelector where
+  defaultRenderSelectorJSON (DynamicEventSelector n) =
+    (fromText n, defaultRenderFieldJSON)
+
+instance DefaultRenderFieldJSON DynamicField where
+  defaultRenderFieldJSON (DynamicField {..}) = (fromText name, value)
+
 -- | A function to render a given structured exception to JSON.
 type RenderExJSON stex = stex -> Value
-
--- | Render a 'DynamicEventSelector' and all its sub-fields.
-renderDynamicEventSelectorJSON :: RenderSelectorJSON DynamicEventSelector
-renderDynamicEventSelectorJSON (DynamicEventSelector n) =
-  (fromText n, renderDynamicFieldJSON)
-
--- | Render a 'DynamicField'
-renderDynamicFieldJSON :: RenderFieldJSON DynamicField
-renderDynamicFieldJSON f = (fromText (name f), value f)
-
--- | Render a 'SomeJSONException' to JSON.
---
--- It is __not__ necessary to use 'SomeJSONException' for the base of your
--- structured exceptions in a JSON backend, so long as you provide a
--- 'RenderExJSON' for your base exception type.
-renderJSONException :: RenderExJSON SomeJSONException
-renderJSONException (SomeJSONException e) = toJSON e
 
 -- | A possible base type for structured exceptions renderable to JSON.
 --
 -- It is __not__ necessary to use 'SomeJSONException' for the base of your
 -- structured exceptions in a JSON backend, so long as you provide a
--- 'RenderExJSON' for your base exception type.
+-- 'RenderExJSON' for your base exception type (or use 'ToJSON'-based rendering).
 data SomeJSONException = forall e. (Exception e, ToJSON e) => SomeJSONException e
 
 instance Show SomeJSONException where
-  show (SomeJSONException e) = show e
   showsPrec i (SomeJSONException e) = showsPrec i e
+
+instance ToJSON SomeJSONException where
+  toJSON (SomeJSONException e) = toJSON e
+  toEncoding (SomeJSONException e) = toEncoding e
 
 instance Exception SomeJSONException
 

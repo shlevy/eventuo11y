@@ -11,7 +11,7 @@
     flags = {};
     package = {
       specVersion = "3.0";
-      identifier = { name = "eventuo11y-batteries"; version = "0.2.1.0"; };
+      identifier = { name = "eventuo11y-batteries"; version = "0.2.1.1"; };
       license = "Apache-2.0";
       copyright = "Copyright 2022 Shea Levy.";
       maintainer = "shea@shealevy.com";
@@ -33,13 +33,14 @@
     components = {
       "library" = {
         depends = [
-          (hsPkgs."aeson" or (errorHandler.buildDepError "aeson"))
           (hsPkgs."base" or (errorHandler.buildDepError "base"))
+          (hsPkgs."aeson" or (errorHandler.buildDepError "aeson"))
           (hsPkgs."binary" or (errorHandler.buildDepError "binary"))
           (hsPkgs."bytestring" or (errorHandler.buildDepError "bytestring"))
           (hsPkgs."case-insensitive" or (errorHandler.buildDepError "case-insensitive"))
           (hsPkgs."containers" or (errorHandler.buildDepError "containers"))
           (hsPkgs."eventuo11y" or (errorHandler.buildDepError "eventuo11y"))
+          (hsPkgs."eventuo11y-json" or (errorHandler.buildDepError "eventuo11y-json"))
           (hsPkgs."exceptions" or (errorHandler.buildDepError "exceptions"))
           (hsPkgs."http-media" or (errorHandler.buildDepError "http-media"))
           (hsPkgs."http-types" or (errorHandler.buildDepError "http-types"))
