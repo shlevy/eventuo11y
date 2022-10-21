@@ -330,16 +330,30 @@ acquireSubEvent (Event {..}) sel = do
 -- as a child of the given 'Event'.
 subEventBackend ::
   (Monad m) =>
+  -- | Bring selectors from the new backend into the parent event's backend.
+  --
+  -- Use 'id' here plus 'narrowEventBackend'' if you need a more general mapping
+  -- between selector types.
+  (forall f'. s f' -> t f') ->
   -- | The parent event.
-  Event m r s f ->
+  Event m r t f ->
   EventBackend m r s
-subEventBackend Event {..} = modifyEventBackend (setAncestor $ referenceImpl impl) backend
+subEventBackend inj Event {..} =
+  narrowEventBackend inj $
+    modifyEventBackend (setAncestor $ referenceImpl impl) backend
 
 -- | An 'EventBackend' where every otherwise causeless event will be marked
 -- as caused by the given 'Event'.
 causedEventBackend ::
   (Monad m) =>
-  -- | The parent event.
-  Event m r s f ->
+  -- | Bring selectors from the new backend into the causing event's backend.
+  --
+  -- Use 'id' here plus 'narrowEventBackend'' if you need a more general mapping
+  -- between selector types.
+  (forall f'. s f' -> t f') ->
+  -- | The causing event.
+  Event m r t f ->
   EventBackend m r s
-causedEventBackend Event {..} = modifyEventBackend (setInitialCause $ referenceImpl impl) backend
+causedEventBackend inj Event {..} =
+  narrowEventBackend inj $
+    modifyEventBackend (setInitialCause $ referenceImpl impl) backend

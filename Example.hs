@@ -129,12 +129,8 @@ instrumentedMain backend = do
   withEvent backend UsingTempDir $ \ev -> do
     withSystemTempDirectory "example" $ \dir -> do
       addField ev dir
-      let -- Create a new EventBackend where all parentless events are made children of our current event
-          subBackend = subEventBackend ev
-          -- Narrow subBackend to create events from FileSelectors instead of MainSelectors
-          narrowerBackend = narrowEventBackend Writing subBackend
-      -- Pass our narrower backend to writeToFile
-      writeToFile narrowerBackend (dir </> "example.txt") "example"
+      -- Pass a new EventBackend where all parentless events are made children of our current event
+      writeToFile (subEventBackend Writing ev) (dir </> "example.txt") "example"
 
 main :: IO ()
 main =

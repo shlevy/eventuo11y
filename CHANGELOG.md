@@ -2,7 +2,8 @@
 
 ## 0.5.0.0 -- 2022-10-23
 
-Break out eventuo11y-json
+- Break out eventuo11y-json
+- Include narrowing in subEventBackend and causedEventBackend
 
 ## 0.3.2.0 -- 2022-10-04
 

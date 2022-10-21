@@ -62,6 +62,7 @@
                 compiler-nix-name = "ghc924";
                 shell.tools = tools;
                 shell.nativeBuildInputs = extraShellPackages pkgs;
+                shell.additional = hpkgs: [hpkgs.temporary];
                 materialized = materializedFor "project";
               };
 

@@ -46,6 +46,7 @@
         "http-types".revision = (((hackage."http-types")."0.12.3").revisions).default;
         "some".revision = (((hackage."some")."1.0.4.1").revisions).default;
         "some".flags.newtype-unsafe = true;
+        "temporary".revision = (((hackage."temporary")."1.3").revisions).default;
         "comonad".revision = (((hackage."comonad")."5.0.8").revisions).default;
         "comonad".flags.containers = true;
         "comonad".flags.distributive = true;
@@ -338,6 +339,7 @@
           "eventuo11y-batteries".components.library.planned = lib.mkOverride 900 true;
           "splitmix".components.library.planned = lib.mkOverride 900 true;
           "rts".components.library.planned = lib.mkOverride 900 true;
+          "temporary".components.library.planned = lib.mkOverride 900 true;
           "tagged".components.library.planned = lib.mkOverride 900 true;
           "unix".components.library.planned = lib.mkOverride 900 true;
           "simple-sendfile".components.library.planned = lib.mkOverride 900 true;
