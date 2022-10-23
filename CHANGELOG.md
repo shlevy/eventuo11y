@@ -2,6 +2,7 @@
 
 ## 0.5.0.0 -- 2022-10-23
 
+- Add MonadCleanup
 - Break out eventuo11y-json
 - Include narrowing in subEventBackend and causedEventBackend
 

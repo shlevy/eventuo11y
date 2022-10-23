@@ -1,7 +1,10 @@
 {-# LANGUAGE ApplicativeDo #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE RecordWildCards #-}
-
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE CPP #-}
 -- |
 -- Description : Core interface for instrumentation with eventuo11y
 -- Copyright   : Copyright 2022 Shea Levy.
@@ -52,6 +55,10 @@ module Observe.Event
     withEvent,
     withSubEvent,
 
+    -- ** MonadMask variants
+    withEventMask,
+    withSubEventMask,
+
     -- ** Acquire/MonadResource variants
     acquireEvent,
     acquireSubEvent,
@@ -77,8 +84,8 @@ module Observe.Event
   )
 where
 
-import Control.Exception
-import Control.Monad.Catch
+import Control.Exception.Safe
+import Control.Monad.Cleanup
 import Control.Monad.IO.Unlift
 import Data.Acquire
 import Observe.Event.Backend
@@ -177,7 +184,7 @@ addProximate (Event {..}) = addProximateImpl impl
 finalize :: (Monad m) => Event m r s f -> m ()
 finalize (Event {..}) = runOnce finishFlag $ finalizeImpl impl
 
--- | Mark an 'Event' as having failed, possibly due to an 'Exception'.
+-- | Mark an 'Event' as having failed due to an 'Exception'.
 --
 -- In normal usage, this should be automatically called via the use of
 -- the [resource-safe event allocation functions](#g:resourcesafe).
@@ -186,7 +193,7 @@ finalize (Event {..}) = runOnce finishFlag $ finalizeImpl impl
 -- 'failEvent'ed. As a result, it is likely pointless to call
 -- 'addField', 'addParent', or 'addProximate' after this call,
 -- though it still may be reasonable to call 'reference'.
-failEvent :: (Monad m) => Event m r s f -> Maybe SomeException -> m ()
+failEvent :: (Monad m) => Event m r s f -> SomeException -> m ()
 failEvent (Event {..}) = runOnce finishFlag . failImpl impl
 
 -- | Create a new 'Event', selected by the given selector.
@@ -248,20 +255,17 @@ newSubEvent (Event {..}) sel = do
 -- The 'Event' is automatically 'finalize'd (or, if appropriate, 'failEvent'ed)
 -- at the end of the function it's passed to.
 withEvent ::
-  (MonadMask m) =>
+  (MonadCleanup m) =>
   EventBackend m r s ->
   forall f.
   -- | The event selector.
   s f ->
   (Event m r s f -> m a) ->
   m a
-withEvent backend sel go = do
-  (res, ()) <- generalBracket (newEvent backend sel) release go
-  pure res
+withEvent backend sel go = withCleanup (newEvent backend sel) cleanup go
   where
-    release ev (ExitCaseSuccess _) = finalize ev
-    release ev (ExitCaseException e) = failEvent ev $ Just e
-    release ev ExitCaseAbort = failEvent ev Nothing
+    cleanup Nothing = finalize
+    cleanup (Just e) = flip failEvent e
 
 -- | Run an action with a new 'Event' as a child of the given 'Event', selected by the given selector.
 --
@@ -275,7 +279,7 @@ withEvent backend sel go = do
 -- The 'Event' is automatically 'finalize'd (or, if appropriate, 'failEvent'ed)
 -- at the end of the function it's passed to.
 withSubEvent ::
-  (MonadMask m) =>
+  (MonadCleanup m) =>
   -- | The parent 'Event'.
   Event m r s f ->
   forall f'.
@@ -287,10 +291,43 @@ withSubEvent (Event {..}) sel go = withEvent backend sel $ \child -> do
   addParent child $ referenceImpl impl
   go child
 
+-- TODO Implement in terms of withEvent + CleanupFromMask
+
+-- | 'withEvent' in 'MonadMask'
+withEventMask ::
+  forall m r s.
+  (MonadMask m) =>
+  EventBackend m r s ->
+  forall f.
+  -- | The event selector.
+  s f ->
+  forall a.
+  (Event m r s f -> m a) ->
+  m a
+withEventMask backend sel go = bracketWithError (newEvent backend sel) release go
+  where
+    release Nothing = finalize
+    release (Just e) = flip failEvent e
+
+-- TODO implement in terms of withSubEvent + CleanupFromMask
+
+-- | 'withSubEvent' in 'MonadMask'
+withSubEventMask ::
+  (MonadMask m) =>
+  -- | The parent 'Event'.
+  Event m r s f ->
+  forall f'.
+  -- | The child event selector.
+  s f' ->
+  (Event m r s f' -> m a) ->
+  m a
+withSubEventMask (Event {..}) sel go = withEventMask backend sel $ \child -> do
+  addParent child $ referenceImpl impl
+  go child
+
 -- | An 'Acquire' variant of 'withEvent', usable in a t'Control.Monad.Trans.Resource.MonadResource' with 'allocateAcquire'.
 --
--- Until [snoyberg/conduit#460](https://github.com/snoyberg/conduit/issues/460) is addressed, exception
--- information will not be captured.
+-- Prior to @resourcet@ version @1.3.0@, exceptional exit will 'failEvent' with 'AbortException'.
 acquireEvent ::
   (MonadUnliftIO m) =>
   EventBackend m r s ->
@@ -304,13 +341,16 @@ acquireEvent backend sel = withRunInIO $ \runInIO ->
       (runInIO $ newEvent backend sel)
       (release runInIO)
   where
-    release runInIO ev ReleaseException = runInIO $ failEvent ev Nothing
+#if MIN_VERSION_resourcet(1,3,0)
+    release runInIO ev (ReleaseExceptionWith e) = runInIO $ failEvent ev e
+#else
+    release runInIO ev ReleaseException = runInIO . failEvent ev $ toException AbortException
+#endif
     release runInIO ev _ = runInIO $ finalize ev
 
 -- | An 'Acquire' variant of 'withSubEvent', usable in a t'Control.Monad.Trans.Resource.MonadResource' with 'allocateAcquire'.
 --
--- Until [snoyberg/conduit#460](https://github.com/snoyberg/conduit/issues/460) is addressed, exception
--- information will not be captured.
+-- Prior to @resourcet@ version @1.3.0@, exceptional exit will 'failEvent' with 'AbortException'.
 acquireSubEvent ::
   (MonadUnliftIO m) =>
   -- | The parent event.

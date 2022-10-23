@@ -28,7 +28,7 @@ module Observe.Event.Crash
   )
 where
 
-import Control.Monad.Catch
+import Control.Monad.Cleanup
 import Data.Void
 import Observe.Event
 import Observe.Event.BackendModification
@@ -36,7 +36,7 @@ import Observe.Event.Render.JSON
 
 -- | Run an action with a 'ScheduleCrash' that can be called to crash the application.
 withScheduleCrash ::
-  (MonadMask m) =>
+  (MonadCleanup m) =>
   EventBackend m r Crashing ->
   -- | Actually perform the crash.
   DoCrash m ->

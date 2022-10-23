@@ -34,8 +34,8 @@ module Observe.Event.Servant.Client
   )
 where
 
+import Control.Exception.Safe
 import Control.Monad.Base
-import Control.Monad.Catch
 import Control.Monad.Except
 import Control.Monad.Reader
 import Control.Monad.Trans.Control

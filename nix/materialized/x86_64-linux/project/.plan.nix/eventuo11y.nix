@@ -37,10 +37,13 @@
           (hsPkgs."exceptions" or (errorHandler.buildDepError "exceptions"))
           (hsPkgs."primitive" or (errorHandler.buildDepError "primitive"))
           (hsPkgs."resourcet" or (errorHandler.buildDepError "resourcet"))
+          (hsPkgs."safe-exceptions" or (errorHandler.buildDepError "safe-exceptions"))
+          (hsPkgs."transformers" or (errorHandler.buildDepError "transformers"))
           (hsPkgs."unliftio-core" or (errorHandler.buildDepError "unliftio-core"))
           ];
         buildable = true;
         modules = [
+          "Control/Monad/Cleanup"
           "Observe/Event"
           "Observe/Event/Backend"
           "Observe/Event/BackendModification"

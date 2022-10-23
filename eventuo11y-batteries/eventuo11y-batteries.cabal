@@ -34,12 +34,12 @@ library
     , containers           ^>= 0.6
     , eventuo11y           ^>= 0.5
     , eventuo11y-json      ^>= 0.1
-    , exceptions           ^>= 0.10
     , http-media           ^>= 0.8
     , http-types           ^>= 0.12
     , monad-control        ^>= 1.0
     , mtl                  ^>= 2.2
     , network              ^>= 3.1
+    , safe-exceptions      ^>= 0.1
     , semigroupoids        ^>= 5.3
     , servant-client       ^>= 0.19
     , servant-client-core  ^>= 0.19

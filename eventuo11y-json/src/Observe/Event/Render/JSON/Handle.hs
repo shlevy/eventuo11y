@@ -87,7 +87,6 @@ jsonHandleBackend h renderEx renderSel = do
                             <> ifNotNull "parents" parents
                             <> ifNotNull "proximate-causes" proximates
                             <> case r of
-                              Abort -> "abort" .= True
                               StructuredFail e -> "structured-exception" .= renderEx e
                               UnstructuredFail e -> "unstructured-exception" .= show e
                               Finalized -> mempty
@@ -104,13 +103,11 @@ jsonHandleBackend h renderEx renderSel = do
                 addProximateImpl = \r ->
                   atomicModifyIORef' proximatesRef \refs -> (r : refs, ()),
                 finalizeImpl = finish Finalized,
-                failImpl = \me ->
+                failImpl = \e ->
                   finish
-                    ( case me of
-                        Nothing -> Abort
-                        Just e -> case fromException e of
-                          Just se -> StructuredFail se
-                          Nothing -> UnstructuredFail e
+                    ( case fromException e of
+                        Just se -> StructuredFail se
+                        Nothing -> UnstructuredFail e
                     )
               },
         newOnceFlag = newOnceFlagMVar
@@ -131,8 +128,7 @@ simpleJsonStderrBackend = jsonHandleBackend stderr (toJSON @SomeJSONException)
 
 -- | Why did an 'Event' finish?
 data FinishReason stex
-  = Abort
-  | StructuredFail stex
+  = StructuredFail stex
   | UnstructuredFail SomeException
   | Finalized
 

@@ -90,7 +90,7 @@ data EventImpl m r f = EventImpl
     addParentImpl :: !(r -> m ()),
     addProximateImpl :: !(r -> m ()),
     finalizeImpl :: !(m ()),
-    failImpl :: !(Maybe SomeException -> m ())
+    failImpl :: !(SomeException -> m ())
   }
 
 -- | A no-op 'EventBackend'.
@@ -115,7 +115,7 @@ unitEventBackend =
       newOnceFlag = pure alwaysNewOnceFlag
     }
 
--- | An 'EventBackend' which sequentially generates 'Event's in the two given 'EventBackend's.
+-- | An 'EventBackend' which sequentially generates 'Observe.Event.Event's in the two given 'EventBackend's.
 --
 -- This can be used to emit instrumentation in multiple ways (e.g. logs to grafana and metrics on
 -- a prometheus HTML page).
