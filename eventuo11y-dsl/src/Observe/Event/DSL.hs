@@ -210,6 +210,7 @@ lowerCamel (ExplodedName ((hd :|: tl) :| rest)) =
 kebab :: ExplodedName -> String
 kebab = intercalate "-" . fmap (\(hd :|: tl) -> toLower hd : tl) . toList
 
+-- | Self-explanatory
 newtype NonEmptyString = NonEmptyString (NonEmpty Char)
 
 -- | Must be non-empty
@@ -227,5 +228,6 @@ pattern (:|:) hd tl <- NonEmptyString (hd :| tl)
 instance IsString NonEmptyString where
   fromString = fromList
 
+-- | Self-explanatory
 nonEmptyToString :: NonEmptyString -> String
 nonEmptyToString = toList
