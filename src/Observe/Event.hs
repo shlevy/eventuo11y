@@ -4,7 +4,7 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
-{-# LANGUAGE CPP #-}
+
 -- |
 -- Description : Core interface for instrumentation with eventuo11y
 -- Copyright   : Copyright 2022 Shea Levy.
@@ -343,10 +343,11 @@ acquireEvent backend sel = withRunInIO $ \runInIO ->
   where
 #if MIN_VERSION_resourcet(1,3,0)
     release runInIO ev (ReleaseExceptionWith e) = runInIO $ failEvent ev e
+    release runInIO ev _ = runInIO $ finalize ev
 #else
     release runInIO ev ReleaseException = runInIO . failEvent ev $ toException AbortException
-#endif
     release runInIO ev _ = runInIO $ finalize ev
+#endif
 
 -- | An 'Acquire' variant of 'withSubEvent', usable in a t'Control.Monad.Trans.Resource.MonadResource' with 'allocateAcquire'.
 --
