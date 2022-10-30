@@ -8,7 +8,7 @@
         "storable-tuple".revision = (((hackage."storable-tuple")."0.0.3.3").revisions).default;
         "storable-tuple".flags.splitbase = true;
         "happy".revision = (((hackage."happy")."1.20.0").revisions).default;
-        "streaming-commons".revision = (((hackage."streaming-commons")."0.2.2.4").revisions).default;
+        "streaming-commons".revision = (((hackage."streaming-commons")."0.2.2.5").revisions).default;
         "streaming-commons".flags.use-bytestring-builder = false;
         "pretty".revision = (((hackage."pretty")."1.1.3.6").revisions).default;
         "haskell-src-exts".revision = (((hackage."haskell-src-exts")."1.23.1").revisions).default;
@@ -66,7 +66,7 @@
         "base-compat-batteries".revision = (((hackage."base-compat-batteries")."0.12.2").revisions).default;
         "Cabal".revision = (((hackage."Cabal")."3.6.3.0").revisions).default;
         "assoc".revision = (((hackage."assoc")."1.0.2").revisions).default;
-        "unliftio".revision = (((hackage."unliftio")."0.2.22.0").revisions).default;
+        "unliftio".revision = (((hackage."unliftio")."0.2.23.0").revisions).default;
         "data-fix".revision = (((hackage."data-fix")."0.3.2").revisions).default;
         "tls".revision = (((hackage."tls")."1.6.0").revisions).default;
         "tls".flags.network = true;
@@ -128,7 +128,7 @@
         "js-flot".revision = (((hackage."js-flot")."0.8.3").revisions).default;
         "mmap".revision = (((hackage."mmap")."0.5.9").revisions).default;
         "mmap".flags.mmaptest = false;
-        "resourcet".revision = (((hackage."resourcet")."1.2.6").revisions).default;
+        "resourcet".revision = (((hackage."resourcet")."1.3.0").revisions).default;
         "vault".revision = (((hackage."vault")."0.3.1.5").revisions).default;
         "vault".flags.useghc = true;
         "data-default-instances-old-locale".revision = (((hackage."data-default-instances-old-locale")."0.0.1").revisions).default;
@@ -274,6 +274,7 @@
         "QuickCheck".revision = (((hackage."QuickCheck")."2.14.2").revisions).default;
         "QuickCheck".flags.old-random = false;
         "QuickCheck".flags.templatehaskell = true;
+        "safe-exceptions".revision = (((hackage."safe-exceptions")."0.1.7.3").revisions).default;
         "uuid-types".revision = (((hackage."uuid-types")."1.0.5").revisions).default;
         "auto-update".revision = (((hackage."auto-update")."0.1.6").revisions).default;
         "containers".revision = (((hackage."containers")."0.6.5.1").revisions).default;
@@ -346,6 +347,7 @@
           "data-fix".components.library.planned = lib.mkOverride 900 true;
           "unliftio".components.library.planned = lib.mkOverride 900 true;
           "exceptions".components.library.planned = lib.mkOverride 900 true;
+          "safe-exceptions".components.library.planned = lib.mkOverride 900 true;
           "old-time".components.library.planned = lib.mkOverride 900 true;
           "dlist".components.library.planned = lib.mkOverride 900 true;
           "time-manager".components.library.planned = lib.mkOverride 900 true;
