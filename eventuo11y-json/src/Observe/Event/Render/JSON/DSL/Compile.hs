@@ -1,5 +1,9 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE TemplateHaskellQuotes #-}
+#if ! MIN_VERSION_template_haskell(2,18,0)
+{-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE TypeFamilies #-}
+#endif
 
 -- |
 -- Description : Compile the "Observe.Event.DSL" and generate "Observe.Event.Render.JSON" instances
@@ -11,10 +15,13 @@ module Observe.Event.Render.JSON.DSL.Compile (compile) where
 import Data.Aeson
 import GHC.Exts
 import Language.Haskell.TH
-import Language.Haskell.TH.Syntax.Compat as THC
 import Observe.Event.DSL
 import qualified Observe.Event.DSL.Compile as DSL
 import Observe.Event.Render.JSON
+
+#if ! MIN_VERSION_template_haskell(2,18,0)
+type Quote m = m ~ Q
+#endif
 
 conPCompat :: Name -> [Pat] -> Pat
 #if MIN_VERSION_template_haskell(2,18,0)
@@ -27,7 +34,7 @@ conPCompat = ConP
 --
 -- Assumes leaf types (i.e., those in 'SimpleType' or a 'FieldConstructorSpec') are 'ToJSON', and
 -- that 'Inject'ed selectors have a 'DefaultRenderSelectorJSON' instance.
-compile :: (THC.Quote m) => SelectorSpec -> m [Dec]
+compile :: (Quote m) => SelectorSpec -> m [Dec]
 compile s@(SelectorSpec selectorNameBase selectors) = do
   -- Walks the selectors twice, will fix when SelectorSpec is extensible (e.g. recursion-schemes)
   baseDecs <- DSL.compile s

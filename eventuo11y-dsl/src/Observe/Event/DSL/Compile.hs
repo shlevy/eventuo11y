@@ -1,4 +1,9 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE TemplateHaskellQuotes #-}
+#if ! MIN_VERSION_template_haskell(2,18,0)
+{-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE TypeFamilies #-}
+#endif
 
 -- |
 -- Description : Compile the "Observe.Event.DSL" with TemplateHaskell
@@ -11,11 +16,14 @@ import Control.Monad
 import Data.Void
 import GHC.Exts
 import Language.Haskell.TH
-import Language.Haskell.TH.Syntax.Compat as THC
 import Observe.Event.DSL
 
+#if ! MIN_VERSION_template_haskell(2,18,0)
+type Quote m = m ~ Q
+#endif
+
 -- | Compile a 'SelectorSpec' into appropriate declarations.
-compile :: (THC.Quote m) => SelectorSpec -> m [Dec]
+compile :: (Quote m) => SelectorSpec -> m [Dec]
 compile (SelectorSpec selectorNameBase selectors) = do
   (selectorCtors, defs) <- foldM stepSelectors mempty selectors
   let selectorDef =
@@ -35,8 +43,8 @@ compile (SelectorSpec selectorNameBase selectors) = do
             [mkName $ upperCamel nm]
             [(Bang NoSourceUnpackedness SourceStrict, AppT (ConT t) (VarT varX))]
             (AppT (ConT selectorName) (VarT varX))
-    stepSelectors (selectorCtors, defs) (SelectorConstructorSpec nm (SimpleType (AnyQuote mt))) = do
-      t <- mt
+    stepSelectors (selectorCtors, defs) (SelectorConstructorSpec nm (SimpleType mt)) = do
+      t <- toQuote mt
       let ctor = GadtC [mkName $ upperCamel nm] [] (AppT (ConT selectorName) t)
       pure (ctor : selectorCtors, defs)
     stepSelectors (selectorCtors, defs) (SelectorConstructorSpec nm (Specified fieldSpec)) = do
@@ -44,7 +52,7 @@ compile (SelectorSpec selectorNameBase selectors) = do
       let ctor = GadtC [mkName $ upperCamel nm] [] (AppT (ConT selectorName) (ConT fieldName))
       pure (ctor : selectorCtors, fieldDef : defs)
 
-compileFieldSpec :: (THC.Quote m) => FieldSpec -> m (Name, Dec)
+compileFieldSpec :: (Quote m) => FieldSpec -> m (Name, Dec)
 compileFieldSpec (FieldSpec fieldNameBase fields) = do
   ctors <- mapM fieldCtor fields
   pure
@@ -52,13 +60,13 @@ compileFieldSpec (FieldSpec fieldNameBase fields) = do
       DataD [] fieldName [] Nothing ctors []
     )
   where
-    makeBangType (AnyQuote mt) = do
-      t <- mt
+    makeBangType mt = do
+      t <- toQuote mt
       pure (Bang NoSourceUnpackedness SourceStrict, t)
 
     fieldCtor (FieldConstructorSpec nm ts) = do
-      let AnyQuote margs = toList <$> mapM makeBangType ts
-      args <- margs
+      let margs = toList <$> mapM makeBangType ts
+      args <- toQuote margs
       pure $ NormalC (mkName $ upperCamel nm) args
 
     fieldName = mkName $ upperCamel fieldNameBase <> "Field"

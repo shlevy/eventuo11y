@@ -6,6 +6,8 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
+-- Duplication due to compatibility for AnyQuote
+{-# OPTIONS_GHC -Wno-duplicate-exports #-}
 
 -- |
 -- Description : DSL for generating 'Observe.Event.Event' fields and selectors
@@ -35,6 +37,7 @@ module Observe.Event.DSL
 
     -- ** Quote polymorphism
     AnyQuote (..),
+    toQuote,
     AnyType,
 
     -- ** Names
@@ -47,14 +50,15 @@ module Observe.Event.DSL
   )
 where
 
+#if MIN_VERSION_template_haskell(2,18,0)
 import Control.Applicative
+#endif
 import Data.Char
 import Data.List
 import Data.List.NonEmpty hiding (fromList, toList)
 import Data.String
 import GHC.Exts
 import Language.Haskell.TH
-import Language.Haskell.TH.Syntax.Compat as THC
 import Observe.Event.Syntax
 
 -- | A specification for an 'Observe.Event.Event' selector type
@@ -155,12 +159,16 @@ instance (a ~ ExplodedName) => RecordField a [Name] FieldConstructorSpec where
 instance (a ~ ExplodedName) => RecordField a Name FieldConstructorSpec where
   k ≔ v = k ≔ ((pure $ ConT v) :| [])
 
--- | A concrete type capturing values that can be instantiated in any
--- 'THC.Quote'.
-newtype AnyQuote a = AnyQuote (forall m. THC.Quote m => m a) deriving (Functor)
-
--- | A 'Type' in any 'THC.Quote'
-type AnyType = AnyQuote Type
+#if MIN_VERSION_template_haskell(2,18,0)
+-- | A concrete type for TH quotes that retains full 'Quote' polymorphism
+--
+-- Prior to @template-haskell@ @2.18@, this is just an alias for 'Q'
+newtype AnyQuote a = AnyQuote
+  { -- | Extract this value in a particular 'Quote' monad
+    --
+    -- Prior to @template-haskell@ @2.18@, this projects into 'Q'.
+    toQuote :: forall m. Quote m => m a
+  } deriving (Functor)
 
 instance Applicative AnyQuote where
   pure x = AnyQuote $ pure x
@@ -175,8 +183,19 @@ instance Monad AnyQuote where
     let AnyQuote res = f x'
     res
 
-instance THC.Quote AnyQuote where
-  newName s = AnyQuote $ THC.newName s
+instance Quote AnyQuote where
+  newName s = AnyQuote $ newName s
+
+#else
+-- | A type alias for TH quotes
+type AnyQuote = Q
+
+toQuote :: AnyQuote a -> Q a
+toQuote = id
+#endif
+
+-- | A 'Type' in any 'Quote'
+type AnyType = AnyQuote Type
 
 -- | A name for some element, broken up into words.
 --

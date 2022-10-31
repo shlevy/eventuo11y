@@ -11,7 +11,7 @@
     flags = {};
     package = {
       specVersion = "3.0";
-      identifier = { name = "eventuo11y-json"; version = "0.1.0.0"; };
+      identifier = { name = "eventuo11y-json"; version = "0.2.0.0"; };
       license = "Apache-2.0";
       copyright = "Copyright 2022 Shea Levy.";
       maintainer = "shea@shealevy.com";
@@ -40,7 +40,6 @@
           (hsPkgs."eventuo11y-dsl" or (errorHandler.buildDepError "eventuo11y-dsl"))
           (hsPkgs."template-haskell" or (errorHandler.buildDepError "template-haskell"))
           (hsPkgs."text" or (errorHandler.buildDepError "text"))
-          (hsPkgs."th-compat" or (errorHandler.buildDepError "th-compat"))
           (hsPkgs."time" or (errorHandler.buildDepError "time"))
           (hsPkgs."uuid" or (errorHandler.buildDepError "uuid"))
           ];

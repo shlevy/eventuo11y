@@ -1,6 +1,6 @@
 cabal-version:      3.0
 name:               eventuo11y-dsl
-version:            0.1.0.0
+version:            0.2.0.0
 synopsis:           DSL for defining eventuo11y fields and selectors
 description:
   Exposes a DSL for low-boilerplate definition of [eventuo11y](https://hackage.haskell.org/package/eventuo11y) fields and selectors.
@@ -36,7 +36,6 @@ library
   build-depends:
     , base              ^>= { 4.14, 4.16 }
     , template-haskell  ^>= { 2.16, 2.18 }
-    , th-compat         ^>= 0.1.4
 
   hs-source-dirs:   src
   default-language: Haskell2010

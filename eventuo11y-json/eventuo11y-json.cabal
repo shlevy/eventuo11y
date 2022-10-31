@@ -1,6 +1,6 @@
 cabal-version:      3.0
 name:               eventuo11y-json
-version:            0.1.0.0
+version:            0.2.0.0
 synopsis:           aeson-based rendering for eventuo11y
 description:
   Render [eventuo11y](https://hackage.haskell.org/package/eventuo11y) 'Observe.Event.Event's
@@ -42,11 +42,10 @@ library
     , base              ^>= { 4.14, 4.16 }
     , aeson             ^>= { 2.0, 2.1 }
     , bytestring        ^>= { 0.10, 0.11 }
-    , eventuo11y        ^>= 0.5.0.0
-    , eventuo11y-dsl    ^>= 0.1.0.0
+    , eventuo11y        ^>= 0.5
+    , eventuo11y-dsl    ^>= 0.2
     , template-haskell  ^>= { 2.16, 2.18 }
     , text              ^>= 1.2
-    , th-compat         ^>= 0.1.4
     , time              ^>= { 1.9, 1.11 }
     , uuid              ^>= 1.3
 
