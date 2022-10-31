@@ -1,5 +1,9 @@
 # Revision history for eventuo11y
 
+## 0.5.1.0 -- 2022-10-31
+
+- Add event allocation functions directly taking BackendModifications.
+
 ## 0.5.0.0 -- 2022-10-23
 
 - Add MonadCleanup

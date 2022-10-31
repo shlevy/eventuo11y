@@ -53,14 +53,17 @@ module Observe.Event
 
     -- * Resource-safe event allocation #resourcesafe#
     withEvent,
+    withEventMods,
     withSubEvent,
 
     -- ** MonadMask variants
     withEventMask,
+    withEventModsMask,
     withSubEventMask,
 
     -- ** Acquire/MonadResource variants
     acquireEvent,
+    acquireEventMods,
     acquireSubEvent,
 
     -- * 'EventBackend's
@@ -267,6 +270,17 @@ withEvent backend sel go = withCleanup (newEvent backend sel) cleanup go
     cleanup Nothing = finalize
     cleanup (Just e) = flip failEvent e
 
+-- | 'withEvent' with 'EventBackendModifiers' applied to the 'EventBackend' first.
+withEventMods ::
+  (MonadCleanup m) =>
+  EventBackendModifiers r r' ->
+  EventBackend m r s ->
+  forall f.
+  s f ->
+  (Event m r' s f -> m a) ->
+  m a
+withEventMods mods = withEvent . modifyEventBackend mods
+
 -- | Run an action with a new 'Event' as a child of the given 'Event', selected by the given selector.
 --
 -- The selector specifies the category of new event we're creating, as well
@@ -309,6 +323,17 @@ withEventMask backend sel go = bracketWithError (newEvent backend sel) release g
     release Nothing = finalize
     release (Just e) = flip failEvent e
 
+-- | 'withEventMask' with 'EventBackendModifiers' applied to the 'EventBackend' first.
+withEventModsMask ::
+  (MonadMask m) =>
+  EventBackendModifiers r r' ->
+  EventBackend m r s ->
+  forall f.
+  s f ->
+  (Event m r' s f -> m a) ->
+  m a
+withEventModsMask mods = withEventMask . modifyEventBackend mods
+
 -- TODO implement in terms of withSubEvent + CleanupFromMask
 
 -- | 'withSubEvent' in 'MonadMask'
@@ -348,6 +373,17 @@ acquireEvent backend sel = withRunInIO $ \runInIO ->
     release runInIO ev ReleaseException = runInIO . failEvent ev $ toException AbortException
     release runInIO ev _ = runInIO $ finalize ev
 #endif
+
+-- | 'acquireEvent' with 'EventBackendModifiers' applied to the 'EventBackend' first.
+acquireEventMods ::
+  (MonadUnliftIO m) =>
+  EventBackendModifiers r r' ->
+  EventBackend m r s ->
+  forall f.
+  -- | The event selector.
+  s f ->
+  m (Acquire (Event m r' s f))
+acquireEventMods mods = acquireEvent . modifyEventBackend mods
 
 -- | An 'Acquire' variant of 'withSubEvent', usable in a t'Control.Monad.Trans.Resource.MonadResource' with 'allocateAcquire'.
 --
