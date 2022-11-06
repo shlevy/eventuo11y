@@ -6,6 +6,7 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeOperators #-}
 -- Duplication due to compatibility for AnyQuote
 {-# OPTIONS_GHC -Wno-duplicate-exports #-}
 

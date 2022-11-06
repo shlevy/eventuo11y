@@ -26,7 +26,7 @@ library
     Observe.Event.Wai
 
   build-depends:
-    , base                 ^>= { 4.14, 4.16 }
+    , base                 ^>= { 4.14, 4.16, 4.17 }
     , aeson                ^>= { 2.0, 2.1 }
     , binary               ^>= 0.8
     , bytestring           ^>= { 0.10, 0.11 }
@@ -37,13 +37,13 @@ library
     , http-media           ^>= 0.8
     , http-types           ^>= 0.12
     , monad-control        ^>= 1.0
-    , mtl                  ^>= 2.2
+    , mtl                  ^>= { 2.2, 2.3 }
     , network              ^>= 3.1
     , safe-exceptions      ^>= 0.1
     , semigroupoids        ^>= 5.3
     , servant-client       ^>= 0.19
     , servant-client-core  ^>= 0.19
-    , text                 ^>= 1.2
+    , text                 ^>= { 1.2, 2.0 }
     , transformers-base    ^>= 0.4
     , wai                  ^>= 3.2
     , warp                 ^>= 3.3

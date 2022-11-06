@@ -39,14 +39,14 @@ library
     Observe.Event.Render.JSON.Handle
 
   build-depends:
-    , base              ^>= { 4.14, 4.16 }
+    , base              ^>= { 4.14, 4.16, 4.17 }
     , aeson             ^>= { 2.0, 2.1 }
     , bytestring        ^>= { 0.10, 0.11 }
     , eventuo11y        ^>= 0.5
     , eventuo11y-dsl    ^>= 0.2
-    , template-haskell  ^>= { 2.16, 2.18 }
-    , text              ^>= 1.2
-    , time              ^>= { 1.9, 1.11 }
+    , template-haskell  ^>= { 2.16, 2.18, 2.19 }
+    , text              ^>= { 1.2, 2.0 }
+    , time              ^>= { 1.9, 1.11, 1.12 }
     , uuid              ^>= 1.3
 
   hs-source-dirs:   src
