@@ -17,6 +17,7 @@ module Observe.Event.Backend
     EventImpl (..),
     unitEventBackend,
     pairEventBackend,
+    noopEventBackend,
     hoistEventBackend,
     hoistEventImpl,
     narrowEventBackend,
@@ -100,20 +101,7 @@ data EventImpl m r f = EventImpl
 --
 -- 'unitEventBackend' is the algebraic unit of 'pairEventBackend'.
 unitEventBackend :: Applicative m => EventBackend m () s
-unitEventBackend =
-  EventBackend
-    { newEventImpl = \_ ->
-        pure $
-          EventImpl
-            { referenceImpl = (),
-              addFieldImpl = const $ pure (),
-              addParentImpl = const $ pure (),
-              addProximateImpl = const $ pure (),
-              finalizeImpl = pure (),
-              failImpl = const $ pure ()
-            },
-      newOnceFlag = pure alwaysNewOnceFlag
-    }
+unitEventBackend = noopEventBackend ()
 
 -- | An 'EventBackend' which sequentially generates 'Observe.Event.Event's in the two given 'EventBackend's.
 --
@@ -144,6 +132,30 @@ pairEventBackend x y =
             pure $ case (xSet, ySet) of
               (NewlySet, NewlySet) -> NewlySet
               _ -> AlreadySet
+    }
+
+-- | A no-op 'EventBackend' that can be integrated with other backends.
+--
+-- This can be used if calling instrumented code from an un-instrumented
+-- context, or to purposefully ignore instrumentation from some call.
+--
+-- All events will have the given reference, so can be connected to appropriate
+-- events in non-no-op backends, but not in a way that can distinguish between
+-- different events from the same no-op backend.
+noopEventBackend :: Applicative m => r -> EventBackend m r s
+noopEventBackend r =
+  EventBackend
+    { newEventImpl = \_ ->
+        pure $
+          EventImpl
+            { referenceImpl = r,
+              addFieldImpl = const $ pure (),
+              addParentImpl = const $ pure (),
+              addProximateImpl = const $ pure (),
+              finalizeImpl = pure (),
+              failImpl = const $ pure ()
+            },
+      newOnceFlag = pure alwaysNewOnceFlag
     }
 
 -- | Hoist an 'EventBackend' along a given natural transformation into a new monad.

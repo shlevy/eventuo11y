@@ -270,14 +270,14 @@ withEvent backend sel go = withCleanup (newEvent backend sel) cleanup go
     cleanup Nothing = finalize
     cleanup (Just e) = flip failEvent e
 
--- | 'withEvent' with 'EventBackendModifiers' applied to the 'EventBackend' first.
+-- | 'withEvent' with 'EventBackendModifier's applied to the 'EventBackend' first.
 withEventMods ::
   (MonadCleanup m) =>
-  EventBackendModifiers r r' ->
+  [EventBackendModifier r] ->
   EventBackend m r s ->
   forall f.
   s f ->
-  (Event m r' s f -> m a) ->
+  (Event m r s f -> m a) ->
   m a
 withEventMods mods = withEvent . modifyEventBackend mods
 
@@ -323,14 +323,14 @@ withEventMask backend sel go = bracketWithError (newEvent backend sel) release g
     release Nothing = finalize
     release (Just e) = flip failEvent e
 
--- | 'withEventMask' with 'EventBackendModifiers' applied to the 'EventBackend' first.
+-- | 'withEventMask' with 'EventBackendModifier's applied to the 'EventBackend' first.
 withEventModsMask ::
   (MonadMask m) =>
-  EventBackendModifiers r r' ->
+  [EventBackendModifier r] ->
   EventBackend m r s ->
   forall f.
   s f ->
-  (Event m r' s f -> m a) ->
+  (Event m r s f -> m a) ->
   m a
 withEventModsMask mods = withEventMask . modifyEventBackend mods
 
@@ -374,15 +374,15 @@ acquireEvent backend sel = withRunInIO $ \runInIO ->
     release runInIO ev _ = runInIO $ finalize ev
 #endif
 
--- | 'acquireEvent' with 'EventBackendModifiers' applied to the 'EventBackend' first.
+-- | 'acquireEvent' with 'EventBackendModifier's applied to the 'EventBackend' first.
 acquireEventMods ::
   (MonadUnliftIO m) =>
-  EventBackendModifiers r r' ->
+  [EventBackendModifier r] ->
   EventBackend m r s ->
   forall f.
   -- | The event selector.
   s f ->
-  m (Acquire (Event m r' s f))
+  m (Acquire (Event m r s f))
 acquireEventMods mods = acquireEvent . modifyEventBackend mods
 
 -- | An 'Acquire' variant of 'withSubEvent', usable in a t'Control.Monad.Trans.Resource.MonadResource' with 'allocateAcquire'.

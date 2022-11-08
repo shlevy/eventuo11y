@@ -1,8 +1,9 @@
 # Revision history for eventuo11y
 
-## 0.5.1.0 -- 2022-10-31
+## 0.6.0.0 -- 2022-11-08
 
-- Add event allocation functions directly taking BackendModifications.
+- Don't allow `BackendModification`s to change resource type
+- Add event allocation functions directly taking `BackendModification`s.
 
 ## 0.5.0.0 -- 2022-10-23
 

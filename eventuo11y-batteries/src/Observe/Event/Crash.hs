@@ -50,7 +50,7 @@ withScheduleCrash backend crash go =
 -- | Function to schedule an application crash.
 newtype ScheduleCrash m r = ScheduleCrash
   { -- | Schedule a crash
-    schedule :: forall r'. EventBackendModifiers r r' -> m ()
+    schedule :: [EventBackendModifier r] -> m ()
   }
 
 -- | Function to actually initiate the crash.
