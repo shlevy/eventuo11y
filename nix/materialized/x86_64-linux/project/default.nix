@@ -20,6 +20,7 @@
         "dlist".revision = (((hackage."dlist")."1.0").revisions).default;
         "dlist".flags.werror = false;
         "text".revision = (((hackage."text")."1.2.5.0").revisions).default;
+        "general-allocate".revision = (((hackage."general-allocate")."0.2.0.0").revisions).default;
         "entropy".revision = (((hackage."entropy")."0.4.1.10").revisions).default;
         "entropy".flags.donotgetentropy = false;
         "array".revision = (((hackage."array")."0.5.4.0").revisions).default;
@@ -377,6 +378,7 @@
           "constraints".components.library.planned = lib.mkOverride 900 true;
           "indexed-traversable".components.library.planned = lib.mkOverride 900 true;
           "network-uri".components.library.planned = lib.mkOverride 900 true;
+          "general-allocate".components.library.planned = lib.mkOverride 900 true;
           "eventuo11y-dsl".components.library.planned = lib.mkOverride 900 true;
           "memory".components.library.planned = lib.mkOverride 900 true;
           "pem".components.library.planned = lib.mkOverride 900 true;

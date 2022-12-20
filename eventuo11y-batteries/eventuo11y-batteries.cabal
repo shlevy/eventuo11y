@@ -34,6 +34,7 @@ library
     , containers           ^>= 0.6
     , eventuo11y           ^>= 0.6
     , eventuo11y-json      ^>= { 0.1, 0.2 }
+    , general-allocate     ^>= { 0.2 }
     , http-media           ^>= 0.8
     , http-types           ^>= 0.12
     , monad-control        ^>= 1.0

@@ -1,9 +1,10 @@
 {-# LANGUAGE ApplicativeDo #-}
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE FlexibleContexts #-}
 
 -- |
 -- Description : Core interface for instrumentation with eventuo11y
@@ -52,19 +53,10 @@ module Observe.Event
     addProximate,
 
     -- * Resource-safe event allocation #resourcesafe#
+    allocateEvent,
     withEvent,
     withEventMods,
     withSubEvent,
-
-    -- ** MonadMask variants
-    withEventMask,
-    withEventModsMask,
-    withSubEventMask,
-
-    -- ** Acquire/MonadResource variants
-    acquireEvent,
-    acquireEventMods,
-    acquireSubEvent,
 
     -- * 'EventBackend's
     EventBackend,
@@ -87,10 +79,10 @@ module Observe.Event
   )
 where
 
-import Control.Exception.Safe
-import Control.Monad.Cleanup
-import Control.Monad.IO.Unlift
-import Data.Acquire
+import Control.Exception
+import Control.Monad.With
+import Data.GeneralAllocate
+import Data.Exceptable
 import Observe.Event.Backend
 import Observe.Event.BackendModification
 
@@ -246,6 +238,29 @@ newSubEvent (Event {..}) sel = do
   addParent child $ referenceImpl impl
   pure child
 
+-- | Allocate a new 'Event', selected by the given selector.
+--
+-- The selector specifies the category of new event we're creating, as well
+-- as the type of fields that can be added to it (with 'addField').
+--
+-- Selectors are intended to be of a domain specific type per unit of
+-- functionality within an instrumented codebase, implemented as a GADT
+-- (but see t'Observe.Event.Dynamic.DynamicEventSelector' for a generic option).
+--
+-- The 'Event' is automatically 'finalize'd (or, if appropriate, 'failEvent'ed)
+-- on release.
+allocateEvent ::
+  (Monad m, Exceptable e) =>
+  EventBackend m r s ->
+  forall f.
+  s f ->
+  GeneralAllocate m e () releaseArg (Event m r s f)
+allocateEvent backend sel = GeneralAllocate $ \restore -> do
+  ev <- restore $ newEvent backend sel
+  let release (ReleaseFailure e) = failEvent ev $ toSomeException e
+      release (ReleaseSuccess _) = finalize ev
+  pure $ GeneralAllocated ev release
+
 -- | Run an action with a new 'Event', selected by the given selector.
 --
 -- The selector specifies the category of new event we're creating, as well
@@ -258,21 +273,18 @@ newSubEvent (Event {..}) sel = do
 -- The 'Event' is automatically 'finalize'd (or, if appropriate, 'failEvent'ed)
 -- at the end of the function it's passed to.
 withEvent ::
-  (MonadCleanup m) =>
+  (MonadWithExceptable m) =>
   EventBackend m r s ->
   forall f.
   -- | The event selector.
   s f ->
   (Event m r s f -> m a) ->
   m a
-withEvent backend sel go = withCleanup (newEvent backend sel) cleanup go
-  where
-    cleanup Nothing = finalize
-    cleanup (Just e) = flip failEvent e
+withEvent backend = generalWith . allocateEvent backend
 
 -- | 'withEvent' with 'EventBackendModifier's applied to the 'EventBackend' first.
 withEventMods ::
-  (MonadCleanup m) =>
+  (MonadWithExceptable m) =>
   [EventBackendModifier r] ->
   EventBackend m r s ->
   forall f.
@@ -293,7 +305,7 @@ withEventMods mods = withEvent . modifyEventBackend mods
 -- The 'Event' is automatically 'finalize'd (or, if appropriate, 'failEvent'ed)
 -- at the end of the function it's passed to.
 withSubEvent ::
-  (MonadCleanup m) =>
+  (MonadWithExceptable m) =>
   -- | The parent 'Event'.
   Event m r s f ->
   forall f'.
@@ -304,104 +316,6 @@ withSubEvent ::
 withSubEvent (Event {..}) sel go = withEvent backend sel $ \child -> do
   addParent child $ referenceImpl impl
   go child
-
--- TODO Implement in terms of withEvent + CleanupFromMask
-
--- | 'withEvent' in 'MonadMask'
-withEventMask ::
-  forall m r s.
-  (MonadMask m) =>
-  EventBackend m r s ->
-  forall f.
-  -- | The event selector.
-  s f ->
-  forall a.
-  (Event m r s f -> m a) ->
-  m a
-withEventMask backend sel go = bracketWithError (newEvent backend sel) release go
-  where
-    release Nothing = finalize
-    release (Just e) = flip failEvent e
-
--- | 'withEventMask' with 'EventBackendModifier's applied to the 'EventBackend' first.
-withEventModsMask ::
-  (MonadMask m) =>
-  [EventBackendModifier r] ->
-  EventBackend m r s ->
-  forall f.
-  s f ->
-  (Event m r s f -> m a) ->
-  m a
-withEventModsMask mods = withEventMask . modifyEventBackend mods
-
--- TODO implement in terms of withSubEvent + CleanupFromMask
-
--- | 'withSubEvent' in 'MonadMask'
-withSubEventMask ::
-  (MonadMask m) =>
-  -- | The parent 'Event'.
-  Event m r s f ->
-  forall f'.
-  -- | The child event selector.
-  s f' ->
-  (Event m r s f' -> m a) ->
-  m a
-withSubEventMask (Event {..}) sel go = withEventMask backend sel $ \child -> do
-  addParent child $ referenceImpl impl
-  go child
-
--- | An 'Acquire' variant of 'withEvent', usable in a t'Control.Monad.Trans.Resource.MonadResource' with 'allocateAcquire'.
---
--- Prior to @resourcet@ version @1.3.0@, exceptional exit will 'failEvent' with 'AbortException'.
-acquireEvent ::
-  (MonadUnliftIO m) =>
-  EventBackend m r s ->
-  forall f.
-  -- | The event selector.
-  s f ->
-  m (Acquire (Event m r s f))
-acquireEvent backend sel = withRunInIO $ \runInIO ->
-  pure $
-    mkAcquireType
-      (runInIO $ newEvent backend sel)
-      (release runInIO)
-  where
-#if MIN_VERSION_resourcet(1,3,0)
-    release runInIO ev (ReleaseExceptionWith e) = runInIO $ failEvent ev e
-    release runInIO ev _ = runInIO $ finalize ev
-#else
-    release runInIO ev ReleaseException = runInIO . failEvent ev $ toException AbortException
-    release runInIO ev _ = runInIO $ finalize ev
-#endif
-
--- | 'acquireEvent' with 'EventBackendModifier's applied to the 'EventBackend' first.
-acquireEventMods ::
-  (MonadUnliftIO m) =>
-  [EventBackendModifier r] ->
-  EventBackend m r s ->
-  forall f.
-  -- | The event selector.
-  s f ->
-  m (Acquire (Event m r s f))
-acquireEventMods mods = acquireEvent . modifyEventBackend mods
-
--- | An 'Acquire' variant of 'withSubEvent', usable in a t'Control.Monad.Trans.Resource.MonadResource' with 'allocateAcquire'.
---
--- Prior to @resourcet@ version @1.3.0@, exceptional exit will 'failEvent' with 'AbortException'.
-acquireSubEvent ::
-  (MonadUnliftIO m) =>
-  -- | The parent event.
-  Event m r s f ->
-  forall f'.
-  -- | The child event selector.
-  s f' ->
-  m (Acquire (Event m r s f'))
-acquireSubEvent (Event {..}) sel = do
-  childAcq <- acquireEvent backend sel
-  withRunInIO $ \runInIO -> pure $ do
-    child <- childAcq
-    liftIO . runInIO . addParent child $ referenceImpl impl
-    pure child
 
 -- | An 'EventBackend' where every otherwise parentless event will be marked
 -- as a child of the given 'Event'.

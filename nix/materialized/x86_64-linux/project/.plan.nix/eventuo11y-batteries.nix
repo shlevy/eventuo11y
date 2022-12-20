@@ -41,6 +41,7 @@
           (hsPkgs."containers" or (errorHandler.buildDepError "containers"))
           (hsPkgs."eventuo11y" or (errorHandler.buildDepError "eventuo11y"))
           (hsPkgs."eventuo11y-json" or (errorHandler.buildDepError "eventuo11y-json"))
+          (hsPkgs."general-allocate" or (errorHandler.buildDepError "general-allocate"))
           (hsPkgs."http-media" or (errorHandler.buildDepError "http-media"))
           (hsPkgs."http-types" or (errorHandler.buildDepError "http-types"))
           (hsPkgs."monad-control" or (errorHandler.buildDepError "monad-control"))

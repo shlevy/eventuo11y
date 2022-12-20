@@ -3,6 +3,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE FlexibleContexts #-}
 
 -- |
 -- Description : Combine eventuo11y instrumentation with crash-only designs.
@@ -28,7 +30,7 @@ module Observe.Event.Crash
   )
 where
 
-import Control.Monad.Cleanup
+import Control.Monad.With
 import Data.Void
 import Observe.Event
 import Observe.Event.BackendModification
@@ -36,7 +38,7 @@ import Observe.Event.Render.JSON
 
 -- | Run an action with a 'ScheduleCrash' that can be called to crash the application.
 withScheduleCrash ::
-  (MonadCleanup m) =>
+  (MonadWithExceptable m) =>
   EventBackend m r Crashing ->
   -- | Actually perform the crash.
   DoCrash m ->
