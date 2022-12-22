@@ -1,10 +1,10 @@
 {-# LANGUAGE BlockArguments #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE FlexibleContexts #-}
 
 -- |
 -- Description : Combine eventuo11y instrumentation with crash-only designs.
@@ -31,40 +31,41 @@ module Observe.Event.Crash
 where
 
 import Control.Monad.With
+import Control.Natural.Control
 import Data.Void
 import Observe.Event
-import Observe.Event.BackendModification
 import Observe.Event.Render.JSON
 
 -- | Run an action with a 'ScheduleCrash' that can be called to crash the application.
 withScheduleCrash ::
   (MonadWithExceptable m) =>
-  EventBackend m r Crashing ->
   -- | Actually perform the crash.
   DoCrash m ->
   (ScheduleCrash m r -> m a) ->
   m a
-withScheduleCrash backend crash go =
-  go $ ScheduleCrash \mods ->
-    let backend' = modifyEventBackend mods backend
-     in withEvent backend' Crashing $ const crash
+withScheduleCrash crash go =
+  go $ ScheduleCrash \backend ->
+    withEvent backend Crashing $ const crash
 
 -- | Function to schedule an application crash.
 newtype ScheduleCrash m r = ScheduleCrash
   { -- | Schedule a crash
-    schedule :: [EventBackendModifier r] -> m ()
+    schedule :: EventBackend m r Crashing -> m ()
   }
 
 -- | Function to actually initiate the crash.
 type DoCrash m = m ()
 
--- | Hoist a 'ScheduleCrash' along a given natural transformation into a new functor.
+-- | Hoist a 'ScheduleCrash' along a given control natural transformation into a new functor.
 hoistScheduleCrash ::
-  -- | Natural transformation from @f@ to @g@.
-  (forall x. f x -> g x) ->
+  (Monad g, Applicative f) =>
+  StatelessControlTransformation f g ->
   ScheduleCrash f r ->
   ScheduleCrash g r
-hoistScheduleCrash nt (ScheduleCrash {..}) = ScheduleCrash $ nt . schedule
+hoistScheduleCrash ct (ScheduleCrash {..}) = ScheduleCrash $ \backend -> do
+  backend' <- statelessTransWith ct $ \runInF ->
+    pure $ hoistEventBackend runInF backend
+  toNatural ct $ schedule backend'
 
 -- | Event selector for 'withScheduleCrash'.
 data Crashing f where

@@ -59,4 +59,4 @@ instance (ToJSON a) => RecordField Text a DynamicField where
 type DynamicEventBackend m r = EventBackend m r DynamicEventSelector
 
 -- | Shorthand for an 'Event' using 'DynamicField's.
-type DynamicEvent m r = Event m r DynamicEventSelector DynamicField
+type DynamicEvent m r = Event m r DynamicField

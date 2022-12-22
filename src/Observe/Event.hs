@@ -1,10 +1,10 @@
 {-# LANGUAGE ApplicativeDo #-}
+{-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE FlexibleContexts #-}
 
 -- |
 -- Description : Core interface for instrumentation with eventuo11y
@@ -30,7 +30,7 @@
 -- be both milestone markers ("we got this far in the process") or more detailed
 -- instrumentation ("we've processed N records"). They are intended to be of a
 -- domain-specific type per unit of functionality within an instrumented codebase
--- (but see t'Observe.Event.Dynamic.DynamicField' for a generic option).
+-- (but see [DynamicField](https://hackage.haskell.org/package/eventuo11y-json/docs/Observe-Event-Dynamic.html#t:DynamicField) for a generic option).
 --
 -- Instrumentation then centers around 'Event's, populated using the
 -- <#g:eventmanip event manipulation functions>. 'Event's are initialized
@@ -40,179 +40,76 @@
 -- Depending on which 'EventBackend's may end up consuming the 'Event's,
 -- instrumentors will also need to define renderers for their selectors
 -- and fields. For example, they may need to implement values of types
---  t'Observe.Event.Render.JSON.RenderSelectorJSON' and
---  t'Observe.Event.Render.JSON.RenderFieldJSON' to use JSON rendering 'EventBackend's.
+-- [RenderSelectorJSON](https://hackage.haskell.org/package/eventuo11y-json/docs/Observe-Event-Render-JSON.html#t:RenderSelectorJSON)
+-- to use JSON rendering 'EventBackend's.
 module Observe.Event
   ( Event,
     hoistEvent,
 
     -- * Event manipulation #eventmanip#
-    reference,
     addField,
+    reference,
     addParent,
     addProximate,
+    addReference,
+    Reference (..),
+    ReferenceType (..),
 
     -- * Resource-safe event allocation #resourcesafe#
     allocateEvent,
     withEvent,
-    withEventMods,
     withSubEvent,
 
     -- * 'EventBackend's
     EventBackend,
+
+    -- ** Backend transformation
     subEventBackend,
     causedEventBackend,
-    unitEventBackend,
-    pairEventBackend,
     hoistEventBackend,
     narrowEventBackend,
+    setDefaultReferenceEventBackend,
+    setAncestorEventBackend,
+    setInitialCauseEventBackend,
+    setReferenceEventBackend,
+    setParentEventBackend,
+    setProximateEventBackend,
     narrowEventBackend',
+
+    -- ** Backend composition
+    unitEventBackend,
+    pairEventBackend,
+    noopEventBackend,
 
     -- * Primitive 'Event' resource management.
 
     -- | Prefer the [resource-safe event allocation functions](#g:resourcesafe)
     -- to these when possible.
     finalize,
-    failEvent,
     newEvent,
     newSubEvent,
   )
 where
 
-import Control.Exception
+import Control.Monad.Primitive
 import Control.Monad.With
-import Data.GeneralAllocate
 import Data.Exceptable
+import Data.GeneralAllocate
 import Observe.Event.Backend
-import Observe.Event.BackendModification
-
--- | An instrumentation event.
---
--- 'Event's are the core of the instrumenting user's interface
--- to eventuo11y. Typical usage would be to create an 'Event'
--- from an 'EventBackend' with 'withEvent', or as a child of
--- an another 'Event' with 'withSubEvent', and add fields to
--- the 'Event' at appropriate points in your code with
--- 'addField'.
---
--- [@m@]: The monad we're instrumenting in.
--- [@r@]: The type of event references. See 'reference'.
--- [@s@]: The type of event selectors for child events. See 'EventBackend'.
--- [@f@]: The type of fields on this event. See 'addField'.
-data Event m r s f = Event
-  { -- | The 'EventBackend' this 'Event' was generated from.
-    backend :: !(EventBackend m r s),
-    -- | The underlying 'EventImpl' implementing the event functionality.
-    impl :: !(EventImpl m r f),
-    -- | A 'OnceFlag' to ensure we only finish ('finalize' or 'failEvent') once.
-    finishFlag :: !(OnceFlag m)
-  }
-
--- | Hoist an 'Event' along a given natural transformation into a new monad.
-hoistEvent :: (Functor m, Functor n) => (forall x. m x -> n x) -> Event m r s f -> Event n r s f
-hoistEvent nt Event {..} =
-  Event
-    { backend = hoistEventBackend nt backend,
-      impl = hoistEventImpl nt impl,
-      finishFlag = hoistOnceFlag nt finishFlag
-    }
-
--- | Obtain a reference to an 'Event'.
---
--- References are used to link 'Event's together, either in
--- parent-child relationships with 'addParent' or in
--- cause-effect relationships with 'addProximate'.
---
--- References can live past when an event has been 'finalize'd or
--- 'failEvent'ed.
---
--- Code being instrumented should always have @r@ as an unconstrained
--- type parameter, both because it is an implementation concern for
--- 'EventBackend's and because references are backend-specific and it
--- would be an error to reference an event in one backend from an event
--- in a different backend.
-reference :: Event m r s f -> r
-reference (Event {..}) = referenceImpl impl
-
--- | Add a field to an 'Event'.
---
--- Fields make up the basic data captured in an event. They should be added
--- to an 'Event' as the code progresses through various phases of work, and can
--- be both milestone markers ("we got this far in the process") or more detailed
--- instrumentation ("we've processed N records").
---
--- They are intended to be of a domain specific type per unit of functionality
--- within an instrumented codebase (but see t'Observe.Event.Dynamic.DynamicField'
--- for a generic option).
-addField ::
-  Event m r s f ->
-  -- | The field to add to the event.
-  f ->
-  m ()
-addField (Event {..}) = addFieldImpl impl
 
 -- | Mark another 'Event' as a parent of this 'Event'.
 addParent ::
-  Event m r s f ->
-  -- | A reference to the parent, obtained via 'reference'.
+  Event m r f ->
   r ->
   m ()
-addParent (Event {..}) = addParentImpl impl
+addParent ev = addReference ev . Reference Parent
 
 -- | Mark another 'Event' as a proximate cause of this 'Event'.
 addProximate ::
-  Event m r s f ->
-  -- | A reference to the proximate cause, obtained via 'reference'.
+  Event m r f ->
   r ->
   m ()
-addProximate (Event {..}) = addProximateImpl impl
-
--- | Mark an 'Event' as finished.
---
--- In normal usage, this should be automatically called via the use of
--- the [resource-safe event allocation functions](#g:resourcesafe).
---
--- This is a no-op if the 'Event' has already been 'finalize'd or
--- 'failEvent'ed. As a result, it is likely pointless to call
--- 'addField', 'addParent', or 'addProximate' after this call,
--- though it still may be reasonable to call 'reference'.
-finalize :: (Monad m) => Event m r s f -> m ()
-finalize (Event {..}) = runOnce finishFlag $ finalizeImpl impl
-
--- | Mark an 'Event' as having failed due to an 'Exception'.
---
--- In normal usage, this should be automatically called via the use of
--- the [resource-safe event allocation functions](#g:resourcesafe).
---
--- This is a no-op if the 'Event' has already been 'finalize'd or
--- 'failEvent'ed. As a result, it is likely pointless to call
--- 'addField', 'addParent', or 'addProximate' after this call,
--- though it still may be reasonable to call 'reference'.
-failEvent :: (Monad m) => Event m r s f -> SomeException -> m ()
-failEvent (Event {..}) = runOnce finishFlag . failImpl impl
-
--- | Create a new 'Event', selected by the given selector.
---
--- The selector specifies the category of new event we're creating, as well
--- as the type of fields that can be added to it (with 'addField').
---
--- Selectors are intended to be of a domain specific type per unit of
--- functionality within an instrumented codebase, implemented as a GADT
--- (but see t'Observe.Event.Dynamic.DynamicEventSelector' for a generic option).
---
--- Consider the [resource-safe event allocation functions](#g:resourcesafe) instead
--- of calling this directly.
-newEvent ::
-  (Applicative m) =>
-  EventBackend m r s ->
-  forall f.
-  -- | The event selector.
-  s f ->
-  m (Event m r s f)
-newEvent backend@(EventBackend {..}) sel = do
-  impl <- newEventImpl sel
-  finishFlag <- newOnceFlag
-  pure Event {..}
+addProximate ev = addReference ev . Reference Proximate
 
 -- | Create a new 'Event' as a child of the given 'Event', selected by the given selector.
 --
@@ -221,21 +118,22 @@ newEvent backend@(EventBackend {..}) sel = do
 --
 -- Selectors are intended to be of a domain specific type per unit of
 -- functionality within an instrumented codebase, implemented as a GADT
--- (but see t'Observe.Event.Dynamic.DynamicEventSelector' for a generic option).
+-- (but see [DynamicEventSelector](https://hackage.haskell.org/package/eventuo11y-json/docs/Observe-Event-Dynamic.html#t:DynamicEventSelector) for a generic option).
 --
 -- Consider the [resource-safe event allocation functions](#g:resourcesafe) instead
 -- of calling this directly.
 newSubEvent ::
   (Monad m) =>
+  EventBackend m r s ->
   -- | The parent event.
-  Event m r s f ->
+  Event m r f ->
   forall f'.
   -- | The child event selector.
   s f' ->
-  m (Event m r s f')
-newSubEvent (Event {..}) sel = do
+  m (Event m r f')
+newSubEvent backend ev sel = do
   child <- newEvent backend sel
-  addParent child $ referenceImpl impl
+  addParent child $ reference ev
   pure child
 
 -- | Allocate a new 'Event', selected by the given selector.
@@ -245,20 +143,19 @@ newSubEvent (Event {..}) sel = do
 --
 -- Selectors are intended to be of a domain specific type per unit of
 -- functionality within an instrumented codebase, implemented as a GADT
--- (but see t'Observe.Event.Dynamic.DynamicEventSelector' for a generic option).
+-- (but see [DynamicEventSelector](https://hackage.haskell.org/package/eventuo11y-json/docs/Observe-Event-Dynamic.html#t:DynamicEventSelector) for a generic option).
 --
--- The 'Event' is automatically 'finalize'd (or, if appropriate, 'failEvent'ed)
--- on release.
+-- The 'Event' is automatically 'finalize'd on release.
 allocateEvent ::
   (Monad m, Exceptable e) =>
   EventBackend m r s ->
   forall f.
   s f ->
-  GeneralAllocate m e () releaseArg (Event m r s f)
+  GeneralAllocate m e () releaseArg (Event m r f)
 allocateEvent backend sel = GeneralAllocate $ \restore -> do
   ev <- restore $ newEvent backend sel
-  let release (ReleaseFailure e) = failEvent ev $ toSomeException e
-      release (ReleaseSuccess _) = finalize ev
+  let release (ReleaseFailure e) = finalize ev . Just $ toSomeException e
+      release (ReleaseSuccess _) = finalize ev Nothing
   pure $ GeneralAllocated ev release
 
 -- | Run an action with a new 'Event', selected by the given selector.
@@ -268,30 +165,18 @@ allocateEvent backend sel = GeneralAllocate $ \restore -> do
 --
 -- Selectors are intended to be of a domain specific type per unit of
 -- functionality within an instrumented codebase, implemented as a GADT
--- (but see t'Observe.Event.Dynamic.DynamicEventSelector' for a generic option).
+-- (but see [DynamicEventSelector](https://hackage.haskell.org/package/eventuo11y-json/docs/Observe-Event-Dynamic.html#t:DynamicEventSelector) for a generic option).
 --
--- The 'Event' is automatically 'finalize'd (or, if appropriate, 'failEvent'ed)
--- at the end of the function it's passed to.
+-- The 'Event' is automatically 'finalize'd at the end of the function it's passed to.
 withEvent ::
   (MonadWithExceptable m) =>
   EventBackend m r s ->
   forall f.
   -- | The event selector.
   s f ->
-  (Event m r s f -> m a) ->
+  (Event m r f -> m a) ->
   m a
 withEvent backend = generalWith . allocateEvent backend
-
--- | 'withEvent' with 'EventBackendModifier's applied to the 'EventBackend' first.
-withEventMods ::
-  (MonadWithExceptable m) =>
-  [EventBackendModifier r] ->
-  EventBackend m r s ->
-  forall f.
-  s f ->
-  (Event m r s f -> m a) ->
-  m a
-withEventMods mods = withEvent . modifyEventBackend mods
 
 -- | Run an action with a new 'Event' as a child of the given 'Event', selected by the given selector.
 --
@@ -300,51 +185,53 @@ withEventMods mods = withEvent . modifyEventBackend mods
 --
 -- Selectors are intended to be of a domain specific type per unit of
 -- functionality within an instrumented codebase, implemented as a GADT
--- (but see t'Observe.Event.Dynamic.DynamicEventSelector' for a generic option).
+-- (but see [DynamicEventSelector](https://hackage.haskell.org/package/eventuo11y-json/docs/Observe-Event-Dynamic.html#t:DynamicEventSelector) for a generic option).
 --
--- The 'Event' is automatically 'finalize'd (or, if appropriate, 'failEvent'ed)
--- at the end of the function it's passed to.
+-- The 'Event' is automatically 'finalize'd at the end of the function it's passed to.
 withSubEvent ::
   (MonadWithExceptable m) =>
+  EventBackend m r s ->
   -- | The parent 'Event'.
-  Event m r s f ->
+  Event m r f ->
   forall f'.
   -- | The child event selector.
   s f' ->
-  (Event m r s f' -> m a) ->
+  (Event m r f' -> m a) ->
   m a
-withSubEvent (Event {..}) sel go = withEvent backend sel $ \child -> do
-  addParent child $ referenceImpl impl
+withSubEvent backend ev sel go = withEvent backend sel $ \child -> do
+  addParent child $ reference ev
   go child
 
 -- | An 'EventBackend' where every otherwise parentless event will be marked
 -- as a child of the given 'Event'.
 subEventBackend ::
-  (Monad m) =>
+  (PrimMonad m) =>
   -- | Bring selectors from the new backend into the parent event's backend.
   --
-  -- Use 'id' here plus 'narrowEventBackend'' if you need a more general mapping
-  -- between selector types.
+  -- See 'setAncestorEventBackend' and 'narrowEventBackend'' if you need a more
+  -- general mapping between selector types.
   (forall f'. s f' -> t f') ->
   -- | The parent event.
-  Event m r t f ->
+  Event m r f ->
+  EventBackend m r t ->
   EventBackend m r s
-subEventBackend inj Event {..} =
-  narrowEventBackend inj $
-    modifyEventBackend (setAncestor $ referenceImpl impl) backend
+subEventBackend inj ev =
+  narrowEventBackend inj
+    . setAncestorEventBackend (reference ev)
 
 -- | An 'EventBackend' where every otherwise causeless event will be marked
 -- as caused by the given 'Event'.
 causedEventBackend ::
-  (Monad m) =>
+  (PrimMonad m) =>
   -- | Bring selectors from the new backend into the causing event's backend.
   --
-  -- Use 'id' here plus 'narrowEventBackend'' if you need a more general mapping
-  -- between selector types.
+  -- See 'setInitialCauseEventBackend' and 'narrowEventBackend'' if you need a more
+  -- general mapping between selector types.
   (forall f'. s f' -> t f') ->
   -- | The causing event.
-  Event m r t f ->
+  Event m r f ->
+  EventBackend m r t ->
   EventBackend m r s
-causedEventBackend inj Event {..} =
-  narrowEventBackend inj $
-    modifyEventBackend (setInitialCause $ referenceImpl impl) backend
+causedEventBackend inj ev =
+  narrowEventBackend inj
+    . setInitialCauseEventBackend (reference ev)

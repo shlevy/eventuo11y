@@ -130,7 +130,7 @@ instrumentedMain backend = do
     withSystemTempDirectory "example" $ \dir -> do
       addField ev dir
       -- Pass a new EventBackend where all parentless events are made children of our current event
-      writeToFile (subEventBackend Writing ev) (dir </> "example.txt") "example"
+      writeToFile (subEventBackend Writing ev backend) (dir </> "example.txt") "example"
 
 main :: IO ()
 main =

@@ -40,9 +40,9 @@
           ];
         buildable = true;
         modules = [
+          "Control/Natural/Control"
           "Observe/Event"
           "Observe/Event/Backend"
-          "Observe/Event/BackendModification"
           ];
         hsSourceDirs = [ "src" ];
         };

@@ -1,6 +1,7 @@
 {-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TypeApplications #-}
@@ -65,52 +66,54 @@ jsonHandleBackend h renderEx renderSel = do
         hPutStrLn h $ encode o
   pure $
     EventBackend
-      { newEventImpl = \sel -> do
+      { newEvent = \sel -> do
           let (k, renderField) = renderSel sel
           eventRef <- coerce nextRandom
           start <- getCurrentTime
           fieldsRef <- newIORef mempty
           parentsRef <- newIORef mempty
           proximatesRef <- newIORef mempty
-          let finish r = do
-                end <- getCurrentTime
-                fields <- readIORef fieldsRef
-                parents <- readIORef parentsRef
-                proximates <- readIORef proximatesRef
-                emit
-                  ( k
-                      .= Object
-                        ( "event-id" .= eventRef
-                            <> "start" .= start
-                            <> "end" .= end
-                            <> ifNotNull "fields" fields
-                            <> ifNotNull "parents" parents
-                            <> ifNotNull "proximate-causes" proximates
-                            <> case r of
-                              StructuredFail e -> "structured-exception" .= renderEx e
-                              UnstructuredFail e -> "unstructured-exception" .= show e
-                              Finalized -> mempty
-                        )
-                  )
+          finishOnce <- newEmptyMVar
+          let finish r =
+                tryPutMVar finishOnce () >>= \case
+                  False -> pure ()
+                  True -> do
+                    end <- getCurrentTime
+                    fields <- readIORef fieldsRef
+                    parents <- readIORef parentsRef
+                    proximates <- readIORef proximatesRef
+                    emit
+                      ( k
+                          .= Object
+                            ( "event-id" .= eventRef
+                                <> "start" .= start
+                                <> "end" .= end
+                                <> ifNotNull "fields" fields
+                                <> ifNotNull "parents" parents
+                                <> ifNotNull "proximate-causes" proximates
+                                <> case r of
+                                  StructuredFail e -> "structured-exception" .= renderEx e
+                                  UnstructuredFail e -> "unstructured-exception" .= show e
+                                  Finalized -> mempty
+                            )
+                      )
           pure $
-            EventImpl
-              { referenceImpl = eventRef,
-                addFieldImpl = \field ->
+            Event
+              { reference = eventRef,
+                addField = \field ->
                   atomicModifyIORef' fieldsRef \fields ->
                     (uncurry insert (renderField field) fields, ()),
-                addParentImpl = \r ->
-                  atomicModifyIORef' parentsRef \refs -> (r : refs, ()),
-                addProximateImpl = \r ->
-                  atomicModifyIORef' proximatesRef \refs -> (r : refs, ()),
-                finalizeImpl = finish Finalized,
-                failImpl = \e ->
-                  finish
-                    ( case fromException e of
-                        Just se -> StructuredFail se
-                        Nothing -> UnstructuredFail e
-                    )
-              },
-        newOnceFlag = newOnceFlagMVar
+                addReference = \(Reference ty r) ->
+                  let refsRef = case ty of
+                        Parent -> parentsRef
+                        Proximate -> proximatesRef
+                   in atomicModifyIORef' refsRef \refs -> (r : refs, ()),
+                finalize = \me -> finish $ case me of
+                  Just e -> case fromException e of
+                    Just se -> StructuredFail se
+                    Nothing -> UnstructuredFail e
+                  Nothing -> Finalized
+              }
       }
 
 -- | An 'EventBackend' which posts events to @stderr@ as JSON.

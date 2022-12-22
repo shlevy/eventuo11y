@@ -55,9 +55,9 @@ source-repository head
 
 library
   exposed-modules:
+    Control.Natural.Control
     Observe.Event
     Observe.Event.Backend
-    Observe.Event.BackendModification
 
   build-depends:
     , base             ^>= { 4.14, 4.16, 4.17 }

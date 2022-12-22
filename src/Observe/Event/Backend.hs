@@ -1,9 +1,8 @@
 {-# LANGUAGE ApplicativeDo #-}
 {-# LANGUAGE BlockArguments #-}
+{-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE RecordWildCards #-}
 
 -- |
 -- Description : Interface for implementing EventBackends
@@ -13,34 +12,106 @@
 --
 -- This is the primary module needed to write new 'EventBackend's.
 module Observe.Event.Backend
-  ( EventBackend (..),
-    EventImpl (..),
+  ( -- * Core interface
+    EventBackend (..),
+    Event (..),
+    Reference (..),
+    ReferenceType (..),
+
+    -- * Backend composition
     unitEventBackend,
     pairEventBackend,
     noopEventBackend,
+
+    -- * Backend transformation
     hoistEventBackend,
-    hoistEventImpl,
+    hoistEvent,
     narrowEventBackend,
+    setDefaultReferenceEventBackend,
+    setAncestorEventBackend,
+    setInitialCauseEventBackend,
+    setReferenceEventBackend,
+    setParentEventBackend,
+    setProximateEventBackend,
     narrowEventBackend',
-
-    -- * OnceFlags
-
-    -- | Generic helper to make operations idempotent.
-    OnceFlag (..),
-    FlagState (..),
-    runOnce,
-    hoistOnceFlag,
-    alwaysNewOnceFlag,
-    newOnceFlagMVar,
   )
 where
 
 import Control.Exception
+import Control.Monad
 import Control.Monad.Primitive
 import Data.Functor
 import Data.Primitive.MVar
 
--- | A backend for creating t'Observe.Event.Event's.
+-- | An instrumentation event.
+--
+-- 'Event's are the core of the instrumenting user's interface
+-- to eventuo11y. Typical usage would be to create an 'Event'
+-- using v'Observe.Event.withEvent' and add fields to the 'Event' at appropriate
+-- points in your code with 'addField'.
+--
+-- [@m@]: The monad we're instrumenting in.
+-- [@r@]: The type of event references. See 'reference'.
+-- [@f@]: The type of fields on this event. See 'addField'.
+data Event m r f = Event
+  { -- | Obtain a reference to an 'Event'.
+    --
+    -- References are used to link 'Event's together, via 'addReference'.
+    --
+    -- References can live past when an event has been 'finalize'd.
+    --
+    -- Code being instrumented should always have @r@ as an unconstrained
+    -- type parameter, both because it is an implementation concern for
+    -- 'EventBackend's and because references are backend-specific and it
+    -- would be an error to reference an event in one backend from an event
+    -- in a different backend.
+    reference :: !r,
+    -- | Add a field to an 'Event'.
+    --
+    -- Fields make up the basic data captured in an event. They should be added
+    -- to an 'Event' as the code progresses through various phases of work, and can
+    -- be both milestone markers ("we got this far in the process") or more detailed
+    -- instrumentation ("we've processed N records").
+    --
+    -- They are intended to be of a domain specific type per unit of functionality
+    -- within an instrumented codebase (but see [DynamicField](https://hackage.haskell.org/package/eventuo11y-json/docs/Observe-Event-Dynamic.html#t:DynamicField)
+    -- for a generic option).
+    addField :: !(f -> m ()),
+    -- | Relate another 'Event' to this 'Event' in the specified way
+    addReference :: !(Reference r -> m ()),
+    -- | Mark an 'Event' as finished, perhaps due to an 'Exception'.
+    --
+    -- In normal usage, this should be automatically called via the use of
+    -- the [resource-safe event allocation functions](Observe-Event.html#g:resourcesafe).
+    --
+    -- This is a no-op if the 'Event' has already been 'finalize'd.
+    -- As a result, it is likely pointless to call
+    -- 'addField' or 'addReference' (or v'Observe.Event.addParent' / v'Observe.Event.addProximate')
+    -- after this call, though it still may be reasonable to call 'reference'.
+    finalize :: !(Maybe SomeException -> m ())
+  }
+
+-- | Hoist an 'Event' along a given natural transformation into a new monad.
+hoistEvent :: (forall x. m x -> n x) -> Event m r f -> Event n r f
+hoistEvent nt ev =
+  ev
+    { addField = nt . addField ev,
+      addReference = nt . addReference ev,
+      finalize = nt . finalize ev
+    }
+
+-- | Ways in which 'Event's can 'Reference' each other.
+data ReferenceType
+  = -- | The 'Reference'd 'Event' is a parent of this 'Event'.
+    Parent
+  | -- | The 'Reference'd 'Event' is a proximate cause of this 'Event'.
+    Proximate
+  deriving stock (Eq)
+
+-- | A reference to another 'Event'
+data Reference r = Reference !ReferenceType !r
+
+-- | A backend for creating t'Event's.
 --
 -- Different 'EventBackend's will be used to emit instrumentation to
 -- different systems. Multiple backends can be combined with
@@ -65,33 +136,31 @@ import Data.Primitive.MVar
 --
 -- Selectors are intended to be of a domain specific type per unit of
 -- functionality within an instrumented codebase, implemented as a GADT
--- (but see t'Observe.Event.Dynamic.DynamicEventSelector' for a generic option).
+-- (but see [DynamicEventSelector](https://hackage.haskell.org/package/eventuo11y-json/docs/Observe-Event-Dynamic.html#t:DynamicEventSelector) for a generic option).
 --
 -- Implementations must ensure that 'EventBackend's and their underlying t'Observe.Event.Event's
 -- are safe to use across threads.
 --
 -- [@m@]: The monad we're instrumenting in.
 -- [@r@]: The type of event references used in this 'EventBackend'. See 'Observe.Event.reference'.
--- [@s@]: The type of event selectors.
-data EventBackend m r s = EventBackend
-  { -- | Create a new 'EventImpl' corresponding to the given selector.
-    newEventImpl :: !(forall f. s f -> m (EventImpl m r f)),
-    -- | Allocate a new 'OnceFlag' in our monad.
-    newOnceFlag :: !(m (OnceFlag m))
-  }
-
--- | The internal implementation of an t'Observe.Event.Event'.
---
--- All fields have corresponding [event manipulation functions](Observe-Event.html#g:eventmanip),
--- except that 'finalizeImpl' and 'failImpl' can assume that they will only ever be called
--- once (i.e., 'EventImpl' implementations do __not__ have to implement locking internally).
-data EventImpl m r f = EventImpl
-  { referenceImpl :: !r,
-    addFieldImpl :: !(f -> m ()),
-    addParentImpl :: !(r -> m ()),
-    addProximateImpl :: !(r -> m ()),
-    finalizeImpl :: !(m ()),
-    failImpl :: !(SomeException -> m ())
+-- [@s@]: The type of event selectors. See 'newEvent'.
+newtype EventBackend m r s = EventBackend
+  { -- | Create a new 'Event', selected by the given selector.
+    --
+    -- The selector specifies the category of new event we're creating, as well
+    -- as the type of fields that can be added to it (with 'addField').
+    --
+    -- Selectors are intended to be of a domain specific type per unit of
+    -- functionality within an instrumented codebase, implemented as a GADT
+    -- (but see [DynamicEventSelector](https://hackage.haskell.org/package/eventuo11y-json/docs/Observe-Event-Dynamic.html#t:DynamicEventSelector) for a generic option).
+    --
+    -- Consider the [resource-safe event allocation functions](Observe-Event.html#g:resourcesafe) instead
+    -- of calling this directly.
+    newEvent ::
+      forall f.
+      -- The event selector.
+      s f ->
+      m (Event m r f)
   }
 
 -- | A no-op 'EventBackend'.
@@ -110,34 +179,22 @@ unitEventBackend = noopEventBackend ()
 pairEventBackend :: Applicative m => EventBackend m a s -> EventBackend m b s -> EventBackend m (a, b) s
 pairEventBackend x y =
   EventBackend
-    { newEventImpl = \sel -> do
-        xImpl <- newEventImpl x sel
-        yImpl <- newEventImpl y sel
+    { newEvent = \sel -> do
+        xEv <- newEvent x sel
+        yEv <- newEvent y sel
         pure $
-          EventImpl
-            { referenceImpl = (referenceImpl xImpl, referenceImpl yImpl),
-              addFieldImpl = \f -> addFieldImpl xImpl f *> addFieldImpl yImpl f,
-              addParentImpl = \(px, py) -> addParentImpl xImpl px *> addParentImpl yImpl py,
-              addProximateImpl = \(px, py) -> addProximateImpl xImpl px *> addProximateImpl yImpl py,
-              finalizeImpl = finalizeImpl xImpl *> finalizeImpl yImpl,
-              failImpl = \e -> failImpl xImpl e *> failImpl yImpl e
-            },
-      newOnceFlag = do
-        xOnce <- newOnceFlag x
-        yOnce <- newOnceFlag y
-        pure $
-          OnceFlag $ do
-            xSet <- checkAndSet xOnce
-            ySet <- checkAndSet yOnce
-            pure $ case (xSet, ySet) of
-              (NewlySet, NewlySet) -> NewlySet
-              _ -> AlreadySet
+          Event
+            { reference = (reference xEv, reference yEv),
+              addField = \f -> addField xEv f *> addField yEv f,
+              addReference = \(Reference ty (rx, ry)) ->
+                addReference xEv (Reference ty rx) *> addReference yEv (Reference ty ry),
+              finalize = \me -> finalize xEv me *> finalize yEv me
+            }
     }
 
 -- | A no-op 'EventBackend' that can be integrated with other backends.
 --
--- This can be used if calling instrumented code from an un-instrumented
--- context, or to purposefully ignore instrumentation from some call.
+-- This can be used to purposefully ignore instrumentation from some call.
 --
 -- All events will have the given reference, so can be connected to appropriate
 -- events in non-no-op backends, but not in a way that can distinguish between
@@ -145,42 +202,25 @@ pairEventBackend x y =
 noopEventBackend :: Applicative m => r -> EventBackend m r s
 noopEventBackend r =
   EventBackend
-    { newEventImpl = \_ ->
+    { newEvent = \_ ->
         pure $
-          EventImpl
-            { referenceImpl = r,
-              addFieldImpl = const $ pure (),
-              addParentImpl = const $ pure (),
-              addProximateImpl = const $ pure (),
-              finalizeImpl = pure (),
-              failImpl = const $ pure ()
-            },
-      newOnceFlag = pure alwaysNewOnceFlag
+          Event
+            { reference = r,
+              addField = const $ pure (),
+              addReference = const $ pure (),
+              finalize = const $ pure ()
+            }
     }
 
 -- | Hoist an 'EventBackend' along a given natural transformation into a new monad.
 hoistEventBackend ::
-  (Functor m, Functor n) =>
-  -- | Natural transformation from @m@ to @n@.
+  (Functor m) =>
   (forall x. m x -> n x) ->
   EventBackend m r s ->
   EventBackend n r s
 hoistEventBackend nt backend =
   EventBackend
-    { newEventImpl = nt . fmap (hoistEventImpl nt) . newEventImpl backend,
-      newOnceFlag = hoistOnceFlag nt <$> (nt $ newOnceFlag backend)
-    }
-
--- | Hoist an 'EventImpl' along a given natural transformation into a new monad.
-hoistEventImpl :: (forall x. m x -> n x) -> EventImpl m r f -> EventImpl n r f
-hoistEventImpl nt (EventImpl {..}) =
-  EventImpl
-    { referenceImpl,
-      addFieldImpl = nt . addFieldImpl,
-      addParentImpl = nt . addParentImpl,
-      addProximateImpl = nt . addProximateImpl,
-      finalizeImpl = nt finalizeImpl,
-      failImpl = nt . failImpl
+    { newEvent = nt . fmap (hoistEvent nt) . newEvent backend
     }
 
 -- | Narrow an 'EventBackend' to a new selector type via a given injection function.
@@ -192,7 +232,7 @@ hoistEventImpl nt (EventImpl {..}) =
 -- See 'narrowEventBackend'' for a more general, if unweildy, variant.
 narrowEventBackend ::
   (Functor m) =>
-  -- | Inject a narrow selector into the wider selector type.
+  -- | Inject a narrower selector into the wider selector type.
   (forall f. s f -> t f) ->
   EventBackend m r t ->
   EventBackend m r s
@@ -212,65 +252,70 @@ narrowEventBackend' ::
   EventBackend m r s
 narrowEventBackend' inj backend =
   EventBackend
-    { newEventImpl = \sel -> inj sel \sel' injField ->
-        newEventImpl backend sel' <&> \case
-          EventImpl {..} ->
-            EventImpl
-              { addFieldImpl = addFieldImpl . injField,
-                ..
-              },
-      newOnceFlag = newOnceFlag backend
+    { newEvent = \sel -> inj sel \sel' injField ->
+        newEvent backend sel' <&> \ev ->
+          ev
+            { addField = addField ev . injField
+            }
     }
 
--- | The state of a 'OnceFlag'
-data FlagState
-  = -- | The flag was not set, but is now
-    NewlySet
-  | -- | The flag was already set
-    AlreadySet
-
--- | A flag to ensure only one operation from some class is performed, once.
+-- | Transform an 'EventBackend' so all of its 'Event's have a given 'Reference'.
 --
--- Typically consumed via 'runOnce'
-newtype OnceFlag m = OnceFlag
-  { -- | Get the state of the 'OnceFlag', and set the flag.
-    --
-    -- This operation should be atomic, and ideally would only
-    -- return 'NewlySet' once. In monads that don't support it,
-    -- at a minimum it must be monotonic (once one caller gets
-    -- 'AlreadySet', all callers will).
-    checkAndSet :: m FlagState
-  }
+-- You likely want 'setDefaultReferenceEventBackend', if your monad supports it.
+setReferenceEventBackend :: (Monad m) => Reference r -> EventBackend m r s -> EventBackend m r s
+setReferenceEventBackend r backend =
+  EventBackend
+    { newEvent = \sel -> do
+        ev <- newEvent backend sel
+        addReference ev r
+        pure ev
+    }
 
--- | Run an operation if no other operations using this
--- 'OnceFlag' have run.
-runOnce :: (Monad m) => OnceFlag m -> m () -> m ()
-runOnce f go =
-  checkAndSet f >>= \case
-    NewlySet -> go
-    AlreadySet -> pure ()
-
--- | A 'OnceFlag' using an 'MVar'.
-newOnceFlagMVar :: (PrimMonad m) => m (OnceFlag m)
-newOnceFlagMVar = do
-  flag <- newEmptyMVar
-  pure $
-    OnceFlag $
-      tryPutMVar flag () <&> \case
-        False -> AlreadySet
-        True -> NewlySet
-
--- | A 'OnceFlag' which is always 'NewlySet'.
+-- | Transform an 'EventBackend' so all of its 'Event's have a given parent.
 --
--- Only safe to use if the operations to be guarded
--- by the flag are already idempotent.
-alwaysNewOnceFlag :: (Applicative m) => OnceFlag m
-alwaysNewOnceFlag = OnceFlag $ pure NewlySet
+-- You likely want 'setAncestorEventBackend', if your monad supports it.
+setParentEventBackend :: (Monad m) => r -> EventBackend m r s -> EventBackend m r s
+setParentEventBackend = setReferenceEventBackend . Reference Parent
 
--- | Hoist a 'OnceFlag' along a given natural transformation into a new monad.
-hoistOnceFlag ::
-  -- | Natural transformation from @f@ to @g@
-  (forall x. f x -> g x) ->
-  OnceFlag f ->
-  OnceFlag g
-hoistOnceFlag nt (OnceFlag cs) = OnceFlag (nt cs)
+-- | Transform an 'EventBackend' so all of its 'Event's have a given proximate cause.
+--
+-- You likely want 'setInitialCauseEventBackend', if your monad supports it.
+setProximateEventBackend :: (Monad m) => r -> EventBackend m r s -> EventBackend m r s
+setProximateEventBackend = setReferenceEventBackend . Reference Proximate
+
+-- | Transform an 'EventBackend' so all of its 'Event's have a given 'Reference', if they
+-- haven't been given a 'Reference' of the same 'ReferenceType' by the time they are 'finalize'd.
+--
+-- See 'setReferenceEventBackend' if the 'Reference' should be applied unconditionally.
+setDefaultReferenceEventBackend :: (PrimMonad m) => Reference r -> EventBackend m r s -> EventBackend m r s
+setDefaultReferenceEventBackend ref@(Reference ty _) backend =
+  EventBackend
+    { newEvent = \sel -> do
+        flag <- newEmptyMVar
+        ev <- newEvent backend sel
+        pure $
+          ev
+            { addReference = \ref'@(Reference ty' _) -> do
+                when (ty' == ty) . void $ tryPutMVar flag ()
+                addReference ev ref',
+              finalize = \me -> do
+                tryPutMVar flag () >>= \case
+                  False -> pure ()
+                  True -> addReference ev ref
+                finalize ev me
+            }
+    }
+
+-- | Transform an 'EventBackend' so all of its 'Event's have a given parent, if they
+-- are not given another parent by the time they are 'finalize'd.
+--
+-- See 'setParentEventBackend' if the parent should be set unconditionally.
+setAncestorEventBackend :: (PrimMonad m) => r -> EventBackend m r s -> EventBackend m r s
+setAncestorEventBackend = setDefaultReferenceEventBackend . Reference Parent
+
+-- | Transform an 'EventBackend' so all of its 'Event's have a given proximate cause,
+-- if they are not given another proximate cause by the time they are 'finalize'd.
+--
+-- See 'setProximateEventBackend' if the proximate cause should be set unconditionally.
+setInitialCauseEventBackend :: (PrimMonad m) => r -> EventBackend m r s -> EventBackend m r s
+setInitialCauseEventBackend = setDefaultReferenceEventBackend . Reference Proximate
