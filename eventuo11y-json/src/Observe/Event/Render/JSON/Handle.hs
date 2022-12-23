@@ -17,6 +17,7 @@ module Observe.Event.Render.JSON.Handle
 
     -- * Internals
     JSONRef (..),
+    newJSONEvent,
   )
 where
 
@@ -40,6 +41,60 @@ import System.IO (Handle, stderr)
 -- Only expected to be used by type inference or by code implementing other backends
 -- using this one.
 newtype JSONRef = JSONRef UUID deriving newtype (ToJSON)
+
+-- | Create a new 'Event' in a 'jsonHandleBackend'.
+newJSONEvent ::
+  (Exception stex) =>
+  -- | Emit the final 'Object'. This will be called at most once.
+  (Object -> IO ()) ->
+  RenderExJSON stex ->
+  RenderFieldJSON f ->
+  IO (Event IO JSONRef f)
+newJSONEvent emit renderEx renderField = do
+  eventRef <- coerce nextRandom
+  start <- getCurrentTime
+  fieldsRef <- newIORef mempty
+  parentsRef <- newIORef mempty
+  proximatesRef <- newIORef mempty
+  finishOnce <- newEmptyMVar
+  let finish r =
+        tryPutMVar finishOnce () >>= \case
+          False -> pure ()
+          True -> do
+            end <- getCurrentTime
+            fields <- readIORef fieldsRef
+            parents <- readIORef parentsRef
+            proximates <- readIORef proximatesRef
+            emit
+              ( "event-id" .= eventRef
+                  <> "start" .= start
+                  <> "end" .= end
+                  <> "duration" .= diffUTCTime end start
+                  <> ifNotNull "fields" fields
+                  <> ifNotNull "parents" parents
+                  <> ifNotNull "proximate-causes" proximates
+                  <> case r of
+                    StructuredFail e -> "structured-exception" .= renderEx e
+                    UnstructuredFail e -> "unstructured-exception" .= show e
+                    Finalized -> mempty
+              )
+  pure $
+    Event
+      { reference = eventRef,
+        addField = \field ->
+          atomicModifyIORef' fieldsRef \fields ->
+            (uncurry insert (renderField field) fields, ()),
+        addReference = \(Reference ty r) ->
+          let refsRef = case ty of
+                Parent -> parentsRef
+                Proximate -> proximatesRef
+           in atomicModifyIORef' refsRef \refs -> (r : refs, ()),
+        finalize = \me -> finish $ case me of
+          Just e -> case fromException e of
+            Just se -> StructuredFail se
+            Nothing -> UnstructuredFail e
+          Nothing -> Finalized
+      }
 
 -- | An 'EventBackend' which posts events to a given 'Handle' as JSON.
 --
@@ -68,53 +123,7 @@ jsonHandleBackend h renderEx renderSel = do
     EventBackend
       { newEvent = \sel -> do
           let (k, renderField) = renderSel sel
-          eventRef <- coerce nextRandom
-          start <- getCurrentTime
-          fieldsRef <- newIORef mempty
-          parentsRef <- newIORef mempty
-          proximatesRef <- newIORef mempty
-          finishOnce <- newEmptyMVar
-          let finish r =
-                tryPutMVar finishOnce () >>= \case
-                  False -> pure ()
-                  True -> do
-                    end <- getCurrentTime
-                    fields <- readIORef fieldsRef
-                    parents <- readIORef parentsRef
-                    proximates <- readIORef proximatesRef
-                    emit
-                      ( k
-                          .= Object
-                            ( "event-id" .= eventRef
-                                <> "start" .= start
-                                <> "end" .= end
-                                <> "duration" .= diffUTCTime end start
-                                <> ifNotNull "fields" fields
-                                <> ifNotNull "parents" parents
-                                <> ifNotNull "proximate-causes" proximates
-                                <> case r of
-                                  StructuredFail e -> "structured-exception" .= renderEx e
-                                  UnstructuredFail e -> "unstructured-exception" .= show e
-                                  Finalized -> mempty
-                            )
-                      )
-          pure $
-            Event
-              { reference = eventRef,
-                addField = \field ->
-                  atomicModifyIORef' fieldsRef \fields ->
-                    (uncurry insert (renderField field) fields, ()),
-                addReference = \(Reference ty r) ->
-                  let refsRef = case ty of
-                        Parent -> parentsRef
-                        Proximate -> proximatesRef
-                   in atomicModifyIORef' refsRef \refs -> (r : refs, ()),
-                finalize = \me -> finish $ case me of
-                  Just e -> case fromException e of
-                    Just se -> StructuredFail se
-                    Nothing -> UnstructuredFail e
-                  Nothing -> Finalized
-              }
+          newJSONEvent (emit . (k .=)) renderEx renderField
       }
 
 -- | An 'EventBackend' which posts events to @stderr@ as JSON.
