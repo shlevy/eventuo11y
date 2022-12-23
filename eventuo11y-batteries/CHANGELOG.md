@@ -1,9 +1,10 @@
 # Revision history for eventuo11y-batteries
 
-## 0.3.0.0 -- 2022-11-08
+## 0.3.0.0 -- 2022-12-23
 
 - Update for eventuo11y 0.6
 - Update for eventu11y-json 0.2
+- Remove Observe.Event.Crash
 
 ## 0.2.1.1 -- 2022-10-23
 

@@ -26,6 +26,9 @@ module Observe.Event.Backend
     -- * Backend transformation
     hoistEventBackend,
     hoistEvent,
+    InjectSelector,
+    injectSelector,
+    idInjectSelector,
     narrowEventBackend,
     setDefaultReferenceEventBackend,
     setAncestorEventBackend,
@@ -33,7 +36,6 @@ module Observe.Event.Backend
     setReferenceEventBackend,
     setParentEventBackend,
     setProximateEventBackend,
-    narrowEventBackend',
   )
 where
 
@@ -223,34 +225,30 @@ hoistEventBackend nt backend =
     { newEvent = nt . fmap (hoistEvent nt) . newEvent backend
     }
 
+-- | Inject a narrower selector and its fields into a wider selector.
+--
+-- See 'injectSelector' for a simple way to construct one of these.
+type InjectSelector s t = forall f. s f -> forall a. (forall g. t g -> (f -> g) -> a) -> a
+
+-- | Construct an 'InjectSelector' with a straightforward injection from @s@ to @t@
+injectSelector :: (forall f. s f -> t f) -> InjectSelector s t
+injectSelector inj sel withInjField = withInjField (inj sel) id
+
+-- | The identity 'InjectSelector'
+idInjectSelector :: InjectSelector s s
+idInjectSelector s go = go s id
+
 -- | Narrow an 'EventBackend' to a new selector type via a given injection function.
 --
 -- A typical usage, where component A calls component B, would be to have A's selector
 -- type have a constructor to take any value of B's selector type (and preserve the field)
 -- and then call 'narrowEventBackend' with that constructor when invoking functions in B.
---
--- See 'narrowEventBackend'' for a more general, if unweildy, variant.
 narrowEventBackend ::
   (Functor m) =>
-  -- | Inject a narrower selector into the wider selector type.
-  (forall f. s f -> t f) ->
+  InjectSelector s t ->
   EventBackend m r t ->
   EventBackend m r s
-narrowEventBackend inj =
-  narrowEventBackend'
-    (\sel withInjField -> withInjField (inj sel) id)
-
--- | Narrow an 'EventBackend' to a new selector type via a given injection function.
---
--- See 'narrowEventBackend' for a simpler, if less general, variant.
-narrowEventBackend' ::
-  (Functor m) =>
-  -- | Simultaneously inject a narrow selector into the wider selector type
-  -- and the narrow selector's field into the wider selector's field type.
-  (forall f. s f -> forall a. (forall g. t g -> (f -> g) -> a) -> a) ->
-  EventBackend m r t ->
-  EventBackend m r s
-narrowEventBackend' inj backend =
+narrowEventBackend inj backend =
   EventBackend
     { newEvent = \sel -> inj sel \sel' injField ->
         newEvent backend sel' <&> \ev ->

@@ -21,7 +21,6 @@ source-repository head
 
 library
   exposed-modules:
-    Observe.Event.Crash
     Observe.Event.Servant.Client
     Observe.Event.Wai
 
@@ -46,6 +45,7 @@ library
     , servant-client-core  ^>= 0.19
     , text                 ^>= { 1.2, 2.0 }
     , transformers-base    ^>= 0.4
+    , unliftio-core        ^>= { 0.2 }
     , wai                  ^>= 3.2
     , warp                 ^>= 3.3
 

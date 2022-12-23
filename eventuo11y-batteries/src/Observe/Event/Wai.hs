@@ -1,8 +1,11 @@
 {-# LANGUAGE BlockArguments #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE StandaloneKindSignatures #-}
+{-# LANGUAGE TypeInType #-}
 
 -- |
 -- Description : Instrument wai with eventuo11y
@@ -11,6 +14,7 @@
 -- Maintainer  : shea@shealevy.com
 module Observe.Event.Wai
   ( -- * Application
+    Application,
     application,
 
     -- ** Instrumentation
@@ -20,6 +24,7 @@ module Observe.Event.Wai
     renderRequestField,
 
     -- * setOnException
+    OnExceptionCallback,
     onExceptionCallback,
 
     -- ** Instrumentation
@@ -34,29 +39,38 @@ module Observe.Event.Wai
 where
 
 import Control.Exception
+import Control.Monad.IO.Unlift
 import Data.Aeson
 import Data.CaseInsensitive
+import Data.Kind
 import Data.Text.Encoding
 import Network.HTTP.Types.Status
 import Network.HTTP.Types.Version
 import Network.Socket
-import Network.Wai
+import Network.Wai hiding (Application)
+import qualified Network.Wai as W
 import Network.Wai.Handler.Warp
 import Network.Wai.Internal
 import Observe.Event
+import Observe.Event.Class
 import Observe.Event.Render.JSON
+
+-- | An instrumented 'W.Application'
+type Application :: EventMonadKind -> ReferenceKind -> SelectorKind -> Type
+type Application em r s = Request -> (Response -> em r s ResponseReceived) -> em r s ResponseReceived
 
 -- | Run an 'Application' with generic 'Request'/'Response' instrumentation.
 application ::
-  EventBackend IO r ServeRequest ->
-  -- | The application, called with a reference to the parent event.
-  (r -> Application) ->
-  Application
-application backend app req respond = withEvent backend ServeRequest \ev -> do
-  addField ev $ ReqField req
-  app (reference ev) req \res -> do
-    addField ev $ ResField res
-    respond res
+  (MonadUnliftIO (em r s), MonadWithEvent em r s) =>
+  InjectSelector ServeRequest s ->
+  Application em r s ->
+  em r s W.Application
+application inj app = withRunInIO \runInIO -> pure \req respond -> runInIO $
+  inj ServeRequest \serveReq injField -> withEvent serveReq \ev -> do
+    addField ev . injField $ ReqField req
+    app req \res -> do
+      addField ev . injField $ ResField res
+      liftIO $ respond res
 
 -- | Event selector for 'application'.
 data ServeRequest f where
@@ -79,17 +93,29 @@ renderRequestField (ReqField req) =
   )
 renderRequestField (ResField res) = ("response-status" .= (statusCode $ responseStatus res))
 
--- | A 'Network.Wai.Handler.Warp.setOnException' callback which creates an 'Event' rendering
--- 'Exception's.
+-- | An instrumented 'Network.Wai.Handler.Warp.setOnException' callback.
+type OnExceptionCallback :: EventMonadKind -> ReferenceKind -> SelectorKind -> Type
+type OnExceptionCallback em r s = Maybe Request -> SomeException -> em r s ()
+
+-- | Convert an 'OnExceptionCallback' to a 'Network.Wai.Handler.Warp.setOnException' callback.
+--
+-- The 'OnExceptionCallback' is called as the child of an 'Event' rendering the exception, if
+-- it's one that should be displayed according to 'defaultShouldDisplayException'.
 --
 -- Ideally this would have a way to get a parent 'Event' from 'application'. Would be nice to
 -- use 'vault', but there doesn't seem to be a way to get at the 'Request' that Warp will pass
 -- here.
-onExceptionCallback :: EventBackend IO r OnException -> Maybe Request -> SomeException -> IO ()
-onExceptionCallback backend req e =
-  if defaultShouldDisplayException e
-    then withEvent backend OnException \ev -> addField ev $ OnExceptionField req e
-    else pure ()
+onExceptionCallback ::
+  (MonadUnliftIO (em r s), MonadWithEvent em r s) =>
+  InjectSelector OnException s ->
+  OnExceptionCallback em r s ->
+  em r s (Maybe Request -> SomeException -> IO ())
+onExceptionCallback inj cb = withRunInIO \runInIO -> pure \req e -> runInIO $
+  case defaultShouldDisplayException e of
+    True -> inj OnException \onEx injField -> withEvent onEx \ev -> do
+      addField ev . injField $ OnExceptionField req e
+      cb req e
+    False -> cb req e
 
 -- | Selector for 'Observe.Event.Wai.onException'
 data OnException f where

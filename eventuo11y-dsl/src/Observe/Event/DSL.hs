@@ -20,7 +20,7 @@
 --
 -- Typical entrypoint is 'SelectorSpec'.
 --
--- See [Example.hs](https://github.com/shlevy/eventuo11y/tree/v0.5.0.0/Example.hs) for an idiomatic example.
+-- See [Example.hs](https://github.com/shlevy/eventuo11y/tree/v0.6.0.0/Example.hs) for an idiomatic example.
 --
 -- See "Observe.Event.DSL.Compile" to compile this into the relevant types.
 module Observe.Event.DSL

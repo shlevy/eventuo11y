@@ -53,15 +53,12 @@
           (hsPkgs."servant-client-core" or (errorHandler.buildDepError "servant-client-core"))
           (hsPkgs."text" or (errorHandler.buildDepError "text"))
           (hsPkgs."transformers-base" or (errorHandler.buildDepError "transformers-base"))
+          (hsPkgs."unliftio-core" or (errorHandler.buildDepError "unliftio-core"))
           (hsPkgs."wai" or (errorHandler.buildDepError "wai"))
           (hsPkgs."warp" or (errorHandler.buildDepError "warp"))
           ];
         buildable = true;
-        modules = [
-          "Observe/Event/Crash"
-          "Observe/Event/Servant/Client"
-          "Observe/Event/Wai"
-          ];
+        modules = [ "Observe/Event/Servant/Client" "Observe/Event/Wai" ];
         hsSourceDirs = [ "src" ];
         };
       };

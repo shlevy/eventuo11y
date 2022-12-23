@@ -1,12 +1,18 @@
 {-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE GeneralisedNewtypeDeriving #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 -- |
 -- Description : Instrument servant-client with eventuo11y
@@ -19,7 +25,8 @@
 -- servant-client functionality in other ways.
 module Observe.Event.Servant.Client
   ( -- * ClientM
-    ClientM (..),
+    ClientM,
+    ClientEnv (..),
     runClientM,
 
     -- ** Instrumentation
@@ -34,63 +41,49 @@ module Observe.Event.Servant.Client
   )
 where
 
-import Control.Exception.Safe
-import Control.Monad.Base
 import Control.Monad.Except
 import Control.Monad.Reader
-import Control.Monad.Trans.Control
 import Data.Aeson
 import Data.Binary.Builder
 import Data.ByteString.Lazy hiding (null)
 import Data.ByteString.Lazy.Internal (ByteString (..))
 import Data.CaseInsensitive
 import Data.Coerce
-import Data.Functor.Alt
 import Data.Map.Strict (mapKeys)
 import Data.Text.Encoding
-import GHC.Generics
 import Network.HTTP.Media.MediaType
 import Network.HTTP.Media.RenderHeader
 import Network.HTTP.Types.Status
 import Network.HTTP.Types.Version
 import Observe.Event
 import Observe.Event.Render.JSON
-import Servant.Client hiding (ClientM, runClientM)
+import Servant.Client hiding (ClientEnv, ClientM, runClientM)
+import qualified Servant.Client as S
 import Servant.Client.Core.Request
 import Servant.Client.Core.RunClient hiding (RunRequest)
-import Servant.Client.Internal.HttpClient hiding (ClientM, runClientM)
-import qualified Servant.Client.Internal.HttpClient as S
 
 -- | A monad to use in place of 'S.ClientM' to get instrumentation on requests.
-newtype ClientM r a = ClientM (ReaderT (EventBackend S.ClientM r RunRequest) S.ClientM a)
-  deriving newtype (Monad, Functor, Applicative, MonadIO, MonadThrow, MonadCatch, MonadError ClientError, MonadBase IO, MonadReader (EventBackend S.ClientM r RunRequest))
-  deriving stock (Generic)
+type ClientM em r s = TransEventMonad (ReaderT (ClientEnv s)) (TransEventMonad (ExceptT ClientError) em) r s
 
-instance MonadBaseControl IO (ClientM r) where
-  type StM (ClientM r) a = Either ClientError a
+-- | An instrumented 'S.ClientEnv'
+data ClientEnv s = ClientEnv
+  { env :: !S.ClientEnv,
+    injectRunRequest :: !(InjectSelector RunRequest s)
+  }
 
-  liftBaseWith go = ClientM $ ReaderT \backend -> liftBaseWith (\run -> go (run . flip runReaderT backend . coerce))
-  restoreM = ClientM . lift . restoreM
-
-instance Alt (ClientM r) where
-  x <!> y = ClientM $ ReaderT \backend -> (runReaderT (coerce x) backend) <!> (runReaderT (coerce y) backend)
-
-  some x = ClientM $ ReaderT \backend -> some (runReaderT (coerce x) backend)
-  many x = ClientM $ ReaderT \backend -> many (runReaderT (coerce x) backend)
-
-instance RunClient (ClientM r) where
-  -- ClientM internals needed pending a release with https://github.com/haskell-servant/servant/commit/658585a7cd2191d1387786d236b8b64cd4a13cb6
-  runRequestAcceptStatus stats req = ClientM $ ReaderT \backend -> S.ClientM $
-    withEvent (hoistEventBackend unClientM backend) RunRequest \ev -> do
-      addField ev $ ReqField req
-      res <- unClientM $ runRequestAcceptStatus stats req
-      addField ev $ ResField res
+instance (MonadIO (em r s), MonadWithEvent em r s) => RunClient (ClientM em r s) where
+  runRequestAcceptStatus stats req = do
+    e <- ask
+    injectRunRequest e RunRequest \runReq injField -> withEvent runReq \ev -> do
+      addField ev . injField $ ReqField req
+      res <- coerce $ const @_ @(ClientEnv s) (liftIO @(em r s) . flip S.runClientM (env e) $ runRequestAcceptStatus stats req)
+      addField ev . injField $ ResField res
       pure res
-  throwClientError = ClientM . lift . throwClientError
+  throwClientError = throwError
 
 -- | Instrumented version of 'S.runClientM'
-runClientM :: EventBackend S.ClientM r RunRequest -> ClientM r a -> ClientEnv -> IO (Either ClientError a)
-runClientM backend c = S.runClientM (runReaderT (coerce c) backend)
+runClientM :: ClientM em r s a -> ClientEnv s -> em r s (Either ClientError a)
+runClientM = coerce
 
 -- | Selector for events in 'ClientM'
 data RunRequest f where

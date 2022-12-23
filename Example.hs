@@ -10,8 +10,9 @@
 
 module Main where
 
-import Control.Exception
+import Control.Exception.Safe
 import Control.Monad
+import Control.Natural.Control
 import Data.Aeson
 import Data.ByteString.Internal
 import Data.Void
@@ -69,37 +70,36 @@ compile $
           ]
     ]
 
--- We take an EventBackend, polymorphic in r, supporting our domain-specific selector type
-writeToFile :: EventBackend IO r FileSelector -> FilePath -> ByteString -> IO ()
-writeToFile backend path bs = do
+-- We run in EventT, polymorphic in r, supporting our domain-specific selector type
+writeToFile :: FilePath -> ByteString -> EventT IO r FileSelector ()
+writeToFile path bs = do
   let (fptr, base_off, sz) = toForeignPtr bs
   -- We start an event, selected by OpenFile
-  fd <- withEvent backend OpenFile $ \ev -> do
+  fd <- withEvent OpenFile $ \ev -> do
     -- We add a Filename field to our current active event
     addField ev $ Filename path
 
-    fd <- openFd path WriteOnly (Just regularFileMode) defaultFileFlags
+    fd <- toNatural eventLift $ openFd path WriteOnly (Just regularFileMode) defaultFileFlags
     when (fd == -1) $ do
-      errno <- getErrno
+      errno <- toNatural eventLift $ getErrno
       -- Throw an exception which we can render as JSON
       throw $ BadOpen path errno
 
     addField ev $ FileFd fd
     pure fd
-  withForeignPtr fptr $ \ptr -> do
+  statelessTransWith eventLift $ \runInIO -> withForeignPtr fptr $ \ptr -> runInIO $ do
     let bcSz = fromIntegral sz
-        go :: ByteCount -> IO ()
-        go offset = do
-          newOffset <- withEvent backend Write $ \ev -> do
+        go (offset :: ByteCount) = do
+          newOffset <- withEvent Write $ \ev -> do
             let ct = bcSz - offset
             addField ev $ BytesAsked ct
-            written <- fdWriteBuf fd (plusPtr ptr (base_off + fromIntegral offset)) ct
+            written <- toNatural eventLift $ fdWriteBuf fd (plusPtr ptr (base_off + fromIntegral offset)) ct
             addField ev $ BytesActual written
             pure $ offset + written
           when (newOffset < bcSz) $
             go newOffset
     go 0
-  closeFd fd
+  toNatural eventLift $ closeFd fd
   pure ()
 
 -- Define a new exception that can be used with simpleJsonStderrBackend
@@ -124,15 +124,15 @@ compile $
     ]
 
 -- Note a different selector type than writeToFile
-instrumentedMain :: EventBackend IO r MainSelector -> IO ()
-instrumentedMain backend = do
-  withEvent backend UsingTempDir $ \ev -> do
-    withSystemTempDirectory "example" $ \dir -> do
+instrumentedMain :: EventT IO r MainSelector ()
+instrumentedMain = do
+  withNarrowingEvent (injectSelector Writing) UsingTempDir $ \ev -> statelessTransWith eventLift $ \runInIO -> do
+    withSystemTempDirectory "example" $ \dir -> runInIO $ do
       addField ev dir
-      -- Pass a new EventBackend where all parentless events are made children of our current event
-      writeToFile (subEventBackend Writing ev backend) (dir </> "example.txt") "example"
+      -- In writeToFile, all parentless events are made children of our current event
+      writeToFile (dir </> "example.txt") "example"
 
 main :: IO ()
 main =
   -- Initialize a backend to write JSON to stderr and use it.
-  simpleJsonStderrBackend defaultRenderSelectorJSON >>= instrumentedMain
+  simpleJsonStderrBackend defaultRenderSelectorJSON >>= runEventT instrumentedMain

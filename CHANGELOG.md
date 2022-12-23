@@ -1,7 +1,8 @@
 # Revision history for eventuo11y
 
-## 0.6.0.0 -- 2022-12-22
+## 0.6.0.0 -- 2022-12-23
 
+- Add `MonadEvent` for implicit backend management
 - Simplify `EventBackend` and move to backend-modifying functions instead of `BackendModification`
 - Move from `MonadCleanup` to `general-allocate`
 
