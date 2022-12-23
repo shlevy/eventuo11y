@@ -1,6 +1,6 @@
 # Revision history for eventuo11y-dsl
 
-## 0.2.0.0 -- 2022-10-31
+## 0.2.0.0 -- 2022-12-23
 
 - Alias `AnyQuote` to `Q` in old `template-haskell` for direct `[t|Foo|]` syntax
 
