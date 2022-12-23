@@ -88,6 +88,7 @@ jsonHandleBackend h renderEx renderSel = do
                             ( "event-id" .= eventRef
                                 <> "start" .= start
                                 <> "end" .= end
+                                <> "duration" .= diffUTCTime end start
                                 <> ifNotNull "fields" fields
                                 <> ifNotNull "parents" parents
                                 <> ifNotNull "proximate-causes" proximates
