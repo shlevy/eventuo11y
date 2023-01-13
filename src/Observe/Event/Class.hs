@@ -49,6 +49,7 @@ import Control.Monad.Base
 import Control.Monad.Catch
 import Control.Monad.Cont.Class
 import Control.Monad.Error.Class
+import Control.Monad.Fix
 import Control.Monad.IO.Unlift
 import Control.Monad.Primitive
 import Control.Monad.Reader

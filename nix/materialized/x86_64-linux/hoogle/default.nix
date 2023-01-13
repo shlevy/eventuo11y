@@ -12,7 +12,7 @@
         "streaming-commons".flags.use-bytestring-builder = false;
         "pretty".revision = (((hackage."pretty")."1.1.3.6").revisions).default;
         "haskell-src-exts".revision = (((hackage."haskell-src-exts")."1.23.1").revisions).default;
-        "network-uri".revision = (((hackage."network-uri")."2.6.4.1").revisions).default;
+        "network-uri".revision = (((hackage."network-uri")."2.6.4.2").revisions).default;
         "unordered-containers".revision = (((hackage."unordered-containers")."0.2.19.1").revisions).default;
         "unordered-containers".flags.debug = false;
         "integer-logarithms".revision = (((hackage."integer-logarithms")."1.0.3.1").revisions).default;
@@ -24,6 +24,7 @@
         "dlist".flags.werror = false;
         "text".revision = (((hackage."text")."1.2.5.0").revisions).default;
         "easy-file".revision = (((hackage."easy-file")."0.2.2").revisions).default;
+        "data-array-byte".revision = (((hackage."data-array-byte")."0.1.0.1").revisions).default;
         "array".revision = (((hackage."array")."0.5.4.0").revisions).default;
         "base64-bytestring".revision = (((hackage."base64-bytestring")."1.2.1.0").revisions).default;
         "network".revision = (((hackage."network")."3.1.2.7").revisions).default;
@@ -168,7 +169,7 @@
         "random".revision = (((hackage."random")."1.2.1.1").revisions).default;
         "unix-time".revision = (((hackage."unix-time")."0.4.8").revisions).default;
         "wai".revision = (((hackage."wai")."3.2.3").revisions).default;
-        "cookie".revision = (((hackage."cookie")."0.4.5").revisions).default;
+        "cookie".revision = (((hackage."cookie")."0.4.6").revisions).default;
         "process".revision = (((hackage."process")."1.6.16.0").revisions).default;
         "cereal".revision = (((hackage."cereal")."0.5.8.3").revisions).default;
         "cereal".flags.bytestring-builder = false;
@@ -246,8 +247,7 @@
         "warp".flags.warp-debug = false;
         "x509-store".revision = (((hackage."x509-store")."1.6.9").revisions).default;
         "fast-logger".revision = (((hackage."fast-logger")."3.1.1").revisions).default;
-        "hashable".revision = (((hackage."hashable")."1.4.1.0").revisions).default;
-        "hashable".flags.containers = true;
+        "hashable".revision = (((hackage."hashable")."1.4.2.0").revisions).default;
         "hashable".flags.random-initial-seed = false;
         "hashable".flags.integer-gmp = true;
         "integer-gmp".revision = (((hackage."integer-gmp")."1.1").revisions).default;
@@ -412,6 +412,7 @@
           "syb".components.library.planned = lib.mkOverride 900 true;
           "text-short".components.library.planned = lib.mkOverride 900 true;
           "haskell-src-exts".components.library.planned = lib.mkOverride 900 true;
+          "data-array-byte".components.library.planned = lib.mkOverride 900 true;
           "assoc".components.library.planned = lib.mkOverride 900 true;
           "process".components.library.planned = lib.mkOverride 900 true;
           "http-date".components.library.planned = lib.mkOverride 900 true;

@@ -10,12 +10,13 @@
         "pretty".revision = (((hackage."pretty")."1.1.3.6").revisions).default;
         "regex-posix".revision = (((hackage."regex-posix")."0.96.0.1").revisions).default;
         "regex-posix".flags._regex-posix-clib = false;
-        "network-uri".revision = (((hackage."network-uri")."2.6.4.1").revisions).default;
+        "network-uri".revision = (((hackage."network-uri")."2.6.4.2").revisions).default;
         "cabal-install-solver".revision = (((hackage."cabal-install-solver")."3.8.1.0").revisions).default;
         "cabal-install-solver".flags.debug-conflict-sets = false;
         "cabal-install-solver".flags.debug-expensive-assertions = false;
         "cabal-install-solver".flags.debug-tracetree = false;
         "text".revision = (((hackage."text")."1.2.5.0").revisions).default;
+        "data-array-byte".revision = (((hackage."data-array-byte")."0.1.0.1").revisions).default;
         "ed25519".revision = (((hackage."ed25519")."0.0.5.0").revisions).default;
         "ed25519".flags.test-hlint = true;
         "ed25519".flags.test-properties = true;
@@ -77,8 +78,7 @@
         "template-haskell".revision = (((hackage."template-haskell")."2.18.0.0").revisions).default;
         "deepseq".revision = (((hackage."deepseq")."1.4.6.1").revisions).default;
         "unix".revision = (((hackage."unix")."2.7.2.2").revisions).default;
-        "hashable".revision = (((hackage."hashable")."1.4.1.0").revisions).default;
-        "hashable".flags.containers = true;
+        "hashable".revision = (((hackage."hashable")."1.4.2.0").revisions).default;
         "hashable".flags.random-initial-seed = false;
         "hashable".flags.integer-gmp = true;
         "binary".revision = (((hackage."binary")."0.8.9.0").revisions).default;
@@ -165,6 +165,7 @@
           "network-uri".components.library.planned = lib.mkOverride 900 true;
           "regex-posix".components.library.planned = lib.mkOverride 900 true;
           "HTTP".components.library.planned = lib.mkOverride 900 true;
+          "data-array-byte".components.library.planned = lib.mkOverride 900 true;
           "process".components.library.planned = lib.mkOverride 900 true;
           "template-haskell".components.library.planned = lib.mkOverride 900 true;
           "stm".components.library.planned = lib.mkOverride 900 true;

@@ -8,7 +8,7 @@
         "streaming-commons".revision = (((hackage."streaming-commons")."0.2.2.5").revisions).default;
         "streaming-commons".flags.use-bytestring-builder = false;
         "pretty".revision = (((hackage."pretty")."1.1.3.6").revisions).default;
-        "network-uri".revision = (((hackage."network-uri")."2.6.4.1").revisions).default;
+        "network-uri".revision = (((hackage."network-uri")."2.6.4.2").revisions).default;
         "unordered-containers".revision = (((hackage."unordered-containers")."0.2.19.1").revisions).default;
         "unordered-containers".flags.debug = false;
         "integer-logarithms".revision = (((hackage."integer-logarithms")."1.0.3.1").revisions).default;
@@ -20,7 +20,8 @@
         "dlist".revision = (((hackage."dlist")."1.0").revisions).default;
         "dlist".flags.werror = false;
         "text".revision = (((hackage."text")."1.2.5.0").revisions).default;
-        "general-allocate".revision = (((hackage."general-allocate")."0.2.0.0").revisions).default;
+        "data-array-byte".revision = (((hackage."data-array-byte")."0.1.0.1").revisions).default;
+        "general-allocate".revision = (((hackage."general-allocate")."0.2.0.1").revisions).default;
         "entropy".revision = (((hackage."entropy")."0.4.1.10").revisions).default;
         "entropy".flags.donotgetentropy = false;
         "array".revision = (((hackage."array")."0.5.4.0").revisions).default;
@@ -161,7 +162,7 @@
         "random".revision = (((hackage."random")."1.2.1.1").revisions).default;
         "unix-time".revision = (((hackage."unix-time")."0.4.8").revisions).default;
         "wai".revision = (((hackage."wai")."3.2.3").revisions).default;
-        "cookie".revision = (((hackage."cookie")."0.4.5").revisions).default;
+        "cookie".revision = (((hackage."cookie")."0.4.6").revisions).default;
         "process".revision = (((hackage."process")."1.6.16.0").revisions).default;
         "utf8-string".revision = (((hackage."utf8-string")."1.0.2").revisions).default;
         "transformers-base".revision = (((hackage."transformers-base")."0.4.6").revisions).default;
@@ -210,8 +211,7 @@
         "warp".flags.x509 = true;
         "warp".flags.allow-sendfilefd = true;
         "warp".flags.warp-debug = false;
-        "hashable".revision = (((hackage."hashable")."1.4.1.0").revisions).default;
-        "hashable".flags.containers = true;
+        "hashable".revision = (((hackage."hashable")."1.4.2.0").revisions).default;
         "hashable".flags.random-initial-seed = false;
         "hashable".flags.integer-gmp = true;
         "integer-gmp".revision = (((hackage."integer-gmp")."1.1").revisions).default;
@@ -386,6 +386,7 @@
           "contravariant".components.library.planned = lib.mkOverride 900 true;
           "appar".components.library.planned = lib.mkOverride 900 true;
           "text-short".components.library.planned = lib.mkOverride 900 true;
+          "data-array-byte".components.library.planned = lib.mkOverride 900 true;
           "entropy".components.library.planned = lib.mkOverride 900 true;
           "assoc".components.library.planned = lib.mkOverride 900 true;
           "process".components.library.planned = lib.mkOverride 900 true;
