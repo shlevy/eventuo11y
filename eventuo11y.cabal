@@ -29,6 +29,9 @@ description:
   See [eventuo11y-dsl](https://hackage.haskell.org/package/eventuo11y-dsl) for simpler syntax for
   creating application-level instrumentation types.
 
+  See [eventuo11y-otel](https://hackage.haskell.org/package/eventuo11y-otel) for an OpenTelemetry-based
+  backend.
+
   See [eventuo11y-json](https://hackage.haskell.org/package/eventuo11y-json) for JSON-based rendering
   and backends.
 

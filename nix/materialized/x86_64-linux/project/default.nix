@@ -2,7 +2,9 @@
   pkgs = hackage:
     {
       packages = {
+        "charset".revision = (((hackage."charset")."0.3.9").revisions).default;
         "old-time".revision = (((hackage."old-time")."1.1.0.3").revisions).default;
+        "vector-builder".revision = (((hackage."vector-builder")."0.3.8.4").revisions).default;
         "servant-client".revision = (((hackage."servant-client")."0.19").revisions).default;
         "mmorph".revision = (((hackage."mmorph")."1.2.0").revisions).default;
         "streaming-commons".revision = (((hackage."streaming-commons")."0.2.2.5").revisions).default;
@@ -72,6 +74,7 @@
         "unliftio".revision = (((hackage."unliftio")."0.2.23.0").revisions).default;
         "data-fix".revision = (((hackage."data-fix")."0.3.2").revisions).default;
         "basement".revision = (((hackage."basement")."0.0.15").revisions).default;
+        "hs-opentelemetry-api".revision = (((hackage."hs-opentelemetry-api")."0.0.3.6").revisions).default;
         "old-locale".revision = (((hackage."old-locale")."1.0.0.7").revisions).default;
         "mtl".revision = (((hackage."mtl")."2.2.2").revisions).default;
         "OneTuple".revision = (((hackage."OneTuple")."0.3.1").revisions).default;
@@ -136,6 +139,7 @@
         "byteorder".revision = (((hackage."byteorder")."1.0.4").revisions).default;
         "http-api-data".revision = (((hackage."http-api-data")."0.5").revisions).default;
         "http-api-data".flags.use-text-show = false;
+        "thread-utils-finalizers".revision = (((hackage."thread-utils-finalizers")."0.1.0.0").revisions).default;
         "ghc-prim".revision = (((hackage."ghc-prim")."0.8.0").revisions).default;
         "vector-stream".revision = (((hackage."vector-stream")."0.1.0.0").revisions).default;
         "ghc-boot-th".revision = (((hackage."ghc-boot-th")."9.2.5").revisions).default;
@@ -193,6 +197,8 @@
         "directory".revision = (((hackage."directory")."1.3.6.2").revisions).default;
         "exceptions".revision = (((hackage."exceptions")."0.10.4").revisions).default;
         "constraints".revision = (((hackage."constraints")."0.13.4").revisions).default;
+        "clock".revision = (((hackage."clock")."0.8.3").revisions).default;
+        "clock".flags.llvm = false;
         "simple-sendfile".revision = (((hackage."simple-sendfile")."0.2.30").revisions).default;
         "simple-sendfile".flags.allow-bsd = true;
         "rts".revision = (((hackage."rts")."1.0.2").revisions).default;
@@ -240,6 +246,7 @@
         "uuid-types".revision = (((hackage."uuid-types")."1.0.5").revisions).default;
         "auto-update".revision = (((hackage."auto-update")."0.1.6").revisions).default;
         "containers".revision = (((hackage."containers")."0.6.5.1").revisions).default;
+        "thread-utils-context".revision = (((hackage."thread-utils-context")."0.2.0.0").revisions).default;
         "StateVar".revision = (((hackage."StateVar")."1.2.2").revisions).default;
         };
       compiler = {
@@ -280,6 +287,7 @@
         eventuo11y = ./.plan.nix/eventuo11y.nix;
         eventuo11y-batteries = ./.plan.nix/eventuo11y-batteries.nix;
         eventuo11y-dsl = ./.plan.nix/eventuo11y-dsl.nix;
+        eventuo11y-otel = ./.plan.nix/eventuo11y-otel.nix;
         eventuo11y-json = ./.plan.nix/eventuo11y-json.nix;
         };
       };
@@ -290,6 +298,7 @@
           "eventuo11y" = { flags = {}; };
           "eventuo11y-batteries" = { flags = {}; };
           "eventuo11y-dsl" = { flags = {}; };
+          "eventuo11y-otel" = { flags = {}; };
           "eventuo11y-json" = { flags = {}; };
           };
         })
@@ -328,6 +337,7 @@
           "old-time".components.library.planned = lib.mkOverride 900 true;
           "dlist".components.library.planned = lib.mkOverride 900 true;
           "time-manager".components.library.planned = lib.mkOverride 900 true;
+          "vector-builder".components.library.planned = lib.mkOverride 900 true;
           "ghc-prim".components.library.planned = lib.mkOverride 900 true;
           "some".components.library.planned = lib.mkOverride 900 true;
           "array".components.library.planned = lib.mkOverride 900 true;
@@ -335,10 +345,12 @@
           "servant-client-core".components.library.planned = lib.mkOverride 900 true;
           "eventuo11y-json".components.library.planned = lib.mkOverride 900 true;
           "binary".components.library.planned = lib.mkOverride 900 true;
+          "charset".components.library.planned = lib.mkOverride 900 true;
           "ghc-boot-th".components.library.planned = lib.mkOverride 900 true;
           "scientific".components.library.planned = lib.mkOverride 900 true;
           "boring".components.library.planned = lib.mkOverride 900 true;
           "eventuo11y-batteries".components.library.planned = lib.mkOverride 900 true;
+          "thread-utils-finalizers".components.library.planned = lib.mkOverride 900 true;
           "splitmix".components.library.planned = lib.mkOverride 900 true;
           "rts".components.library.planned = lib.mkOverride 900 true;
           "temporary".components.library.planned = lib.mkOverride 900 true;
@@ -391,6 +403,7 @@
           "assoc".components.library.planned = lib.mkOverride 900 true;
           "process".components.library.planned = lib.mkOverride 900 true;
           "http-date".components.library.planned = lib.mkOverride 900 true;
+          "clock".components.library.planned = lib.mkOverride 900 true;
           "template-haskell".components.library.planned = lib.mkOverride 900 true;
           "stm".components.library.planned = lib.mkOverride 900 true;
           "byteorder".components.library.planned = lib.mkOverride 900 true;
@@ -417,6 +430,7 @@
           "attoparsec".components.sublibs."attoparsec-internal".planned = lib.mkOverride 900 true;
           "transformers".components.library.planned = lib.mkOverride 900 true;
           "OneTuple".components.library.planned = lib.mkOverride 900 true;
+          "hs-opentelemetry-api".components.library.planned = lib.mkOverride 900 true;
           "parsec".components.library.planned = lib.mkOverride 900 true;
           "deepseq".components.library.planned = lib.mkOverride 900 true;
           "primitive".components.library.planned = lib.mkOverride 900 true;
@@ -433,6 +447,7 @@
           "cryptohash-md5".components.library.planned = lib.mkOverride 900 true;
           "integer-gmp".components.library.planned = lib.mkOverride 900 true;
           "transformers-compat".components.library.planned = lib.mkOverride 900 true;
+          "thread-utils-context".components.library.planned = lib.mkOverride 900 true;
           "monad-control".components.library.planned = lib.mkOverride 900 true;
           "streaming-commons".components.library.planned = lib.mkOverride 900 true;
           "containers".components.library.planned = lib.mkOverride 900 true;
@@ -441,6 +456,7 @@
           "aeson".components.library.planned = lib.mkOverride 900 true;
           "hourglass".components.library.planned = lib.mkOverride 900 true;
           "base-compat".components.library.planned = lib.mkOverride 900 true;
+          "eventuo11y-otel".components.library.planned = lib.mkOverride 900 true;
           "base64-bytestring".components.library.planned = lib.mkOverride 900 true;
           "hashable".components.library.planned = lib.mkOverride 900 true;
           "semigroups".components.library.planned = lib.mkOverride 900 true;

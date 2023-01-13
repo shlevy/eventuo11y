@@ -4,6 +4,7 @@ packages:
   eventuo11y-batteries
   eventuo11y-dsl
   eventuo11y-json
+  eventuo11y-otel
 
 package eventuo11y
   ghc-options: -Wall
