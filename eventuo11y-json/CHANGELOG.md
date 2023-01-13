@@ -1,5 +1,9 @@
 # Revision history for eventuo11y-json
 
+## 0.3.0.0 -- 2023-01-13
+
+- Update for eventuo11y 0.7
+
 ## 0.2.0.0 -- 2022-12-23
 
 - Update for eventuo11y 0.6

@@ -60,24 +60,24 @@ module Observe.Event
     -- * Event manipulation #eventmanip#
     addField,
     reference,
-    Explicit.addParent,
-    Explicit.addProximate,
-    addReference,
-    Reference (..),
-    ReferenceType (..),
 
     -- * MonadEvent
     MonadEvent,
     EnvEvent,
 
     -- ** Resource-safe event allocation #resourcesafe#
+    NewEventArgs (..),
+    emitImmediateEvent',
     withEvent,
+    withEventArgs,
     withNarrowingEvent,
+    withNarrowingEventArgs,
     InjectSelector,
     injectSelector,
     idInjectSelector,
     MonadWithEvent,
     allocateEvent,
+    allocateEventArgs,
 
     -- ** EventT
     EventT,
@@ -101,7 +101,7 @@ module Observe.Event
     -- to these when possible.
     finalize,
     newEvent',
-    newSubEvent,
+    newEventArgs,
 
     -- * Backend Events
 
@@ -118,7 +118,6 @@ module Observe.Event
   )
 where
 
-import Control.Monad.Primitive
 import Control.Monad.With
 import Data.Exceptable
 import Data.GeneralAllocate
@@ -130,6 +129,14 @@ import qualified Observe.Event.Explicit as Explicit
 -- | An 'Event' in a 'MonadEvent'
 type EnvEvent :: EventMonadKind -> ReferenceKind -> SelectorKind -> Type -> Type
 type EnvEvent em r s = Event (em r s) r
+
+-- | Create an event which has no duration and is immediately finalized successfully.
+--
+-- Returns a reference to the event.
+emitImmediateEvent' :: (MonadEvent em) => NewEventArgs r s f -> em r s r
+emitImmediateEvent' args = do
+  b <- backend
+  liftBackendMonad $ emitImmediateEvent b args
 
 -- | Run an action with a new 'Event', selected by the given selector.
 --
@@ -152,6 +159,20 @@ withEvent ::
   em r s a
 withEvent = withNarrowingEvent idInjectSelector
 
+-- | Run an action with a new 'Event', specified by the given 'NewEventArgs'
+--
+-- Within the nested action, all new parentless 'Event's will be
+-- made children of the new 'Event'.
+--
+-- The 'Event' will be 'finalize'd at the end of the nested action.
+withEventArgs ::
+  (MonadWithEvent em r s) =>
+  forall f.
+  NewEventArgs r s f ->
+  (EnvEvent em r s f -> em r s a) ->
+  em r s a
+withEventArgs = withNarrowingEventArgs idInjectSelector
+
 -- | Run an action with a new 'Event' , selected by a given selector, with a narrower sub-selector type.
 --
 -- The selector specifies the category of new event we're creating, as well
@@ -173,12 +194,28 @@ withNarrowingEvent ::
   t f ->
   (EnvEvent em r s f -> em r s x) ->
   em r t x
-withNarrowingEvent inj sel go = withBackendEvent sel $ \ev -> do
+withNarrowingEvent inj = withNarrowingEventArgs inj . simpleNewEventArgs
+
+-- | Run an action with a new 'Event' , specified by the given 'NewEventArgs', with a narrower sub-selector type.
+--
+-- Within the nested action, all new parentless 'Event's will be
+-- made children of the new 'Event', and all new 'Event's will
+-- be selected by the narrower selector type.
+--
+-- The 'Event' will be 'finalize'd at the end of the nested action.
+withNarrowingEventArgs ::
+  (MonadWithEvent em r t) =>
+  InjectSelector s t ->
+  forall f.
+  NewEventArgs r t f ->
+  (EnvEvent em r s f -> em r s x) ->
+  em r t x
+withNarrowingEventArgs inj args go = withBackendEvent args $ \ev -> do
   let ev' = hoistBackendEvent ev
   withModifiedBackend (narrowEventBackend inj . setAncestorEventBackend (reference ev)) $ go ev'
 
 -- | A 'MonadEvent' suitable for running the 'withEvent' family of functions
-type MonadWithEvent em r s = (MonadEvent em, PrimMonad (BackendMonad em), MonadWithExceptable (em r s))
+type MonadWithEvent em r s = (MonadEvent em, MonadWithExceptable (em r s))
 
 -- | Allocate a new 'Event', selected by the given selector.
 --
@@ -195,7 +232,17 @@ allocateEvent ::
   forall f.
   s f ->
   GeneralAllocate (em r s) e () releaseArg (EnvEvent em r s f)
-allocateEvent = fmap hoistBackendEvent . allocateBackendEvent
+allocateEvent = allocateEventArgs . simpleNewEventArgs
+
+-- | Allocate a new 'Event', specified by the given 'NewEventArgs'.
+--
+-- The 'Event' will be automatically 'finalize'd on release.
+allocateEventArgs ::
+  (MonadEvent em, Exceptable e) =>
+  forall f.
+  NewEventArgs r s f ->
+  GeneralAllocate (em r s) e () releaseArg (EnvEvent em r s f)
+allocateEventArgs = fmap hoistBackendEvent . allocateBackendEvent
 
 -- | Create a new 'Event', selected by the given selector.
 --
@@ -209,29 +256,14 @@ allocateEvent = fmap hoistBackendEvent . allocateBackendEvent
 -- Consider the [resource-safe event allocation functions](#g:resourcesafe) instead
 -- of calling this directly.
 newEvent' :: (MonadEvent em) => forall f. s f -> em r s (EnvEvent em r s f)
-newEvent' = fmap hoistBackendEvent . newBackendEvent
+newEvent' = newEventArgs . simpleNewEventArgs
 
--- | Create a new 'Event' as a child of the given 'Event', selected by the given selector.
---
--- The selector specifies the category of new event we're creating, as well
--- as the type of fields that can be added to it (with 'addField').
---
--- Selectors are intended to be of a domain specific type per unit of
--- functionality within an instrumented codebase, implemented as a GADT
--- (but see [DynamicEventSelector](https://hackage.haskell.org/package/eventuo11y-json/docs/Observe-Event-Dynamic.html#t:DynamicEventSelector) for a generic option).
+-- | Create a new 'Event', specified by the given 'NewEventArgs'.
 --
 -- Consider the [resource-safe event allocation functions](#g:resourcesafe) instead
 -- of calling this directly.
-newSubEvent ::
-  (MonadEvent em) =>
-  EnvEvent em r s f ->
-  forall f'.
-  s f' ->
-  em r s (EnvEvent em r s f')
-newSubEvent ev sel = do
-  child <- newEvent' sel
-  Explicit.addParent child $ reference ev
-  pure child
+newEventArgs :: (MonadEvent em) => forall f. NewEventArgs r s f -> em r s (EnvEvent em r s f)
+newEventArgs = fmap hoistBackendEvent . newBackendEvent
 
 -- | An 'Event' in the 'BackendMonad' of a 'MonadEvent'
 type BackendEvent :: EventMonadKind -> ReferenceKind -> Type -> Type
@@ -241,14 +273,14 @@ type BackendEvent em = Event (BackendMonad em)
 hoistBackendEvent :: (MonadEvent em) => BackendEvent em r f -> EnvEvent em r s f
 hoistBackendEvent = hoistEvent liftBackendMonad
 
--- | A 'BackendMonad' variant of 'allocateEvent'.
+-- | A 'BackendMonad' variant of 'allocateEventArgs'.
 allocateBackendEvent ::
   (MonadEvent em, Exceptable e) =>
   forall f.
-  s f ->
+  NewEventArgs r s f ->
   GeneralAllocate (em r s) e () releaseArg (BackendEvent em r f)
-allocateBackendEvent sel = GeneralAllocate $ \_ -> do
-  ev <- newBackendEvent sel
+allocateBackendEvent args = GeneralAllocate $ \_ -> do
+  ev <- newBackendEvent args
   let release (ReleaseFailure e) = liftBackendMonad . finalize ev . Just $ toSomeException e
       release (ReleaseSuccess _) = liftBackendMonad $ finalize ev Nothing
   pure $ GeneralAllocated ev release
@@ -259,13 +291,13 @@ allocateBackendEvent sel = GeneralAllocate $ \_ -> do
 withBackendEvent ::
   (MonadEvent em, MonadWithExceptable (em r s)) =>
   forall f.
-  s f ->
+  NewEventArgs r s f ->
   (BackendEvent em r f -> em r s a) ->
   em r s a
 withBackendEvent = generalWith . allocateBackendEvent
 
--- | A 'BackendMonad' variant of 'newEvent''
-newBackendEvent :: (MonadEvent em) => forall f. s f -> em r s (BackendEvent em r f)
-newBackendEvent sel = do
+-- | A 'BackendMonad' variant of 'newEventArgs'
+newBackendEvent :: (MonadEvent em) => forall f. NewEventArgs r s f -> em r s (BackendEvent em r f)
+newBackendEvent args = do
   b <- backend
-  liftBackendMonad $ Explicit.newEvent b sel
+  liftBackendMonad $ Explicit.newEvent b args

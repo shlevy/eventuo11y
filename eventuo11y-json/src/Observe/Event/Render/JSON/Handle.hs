@@ -4,6 +4,7 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TypeApplications #-}
 
 -- |
@@ -24,7 +25,7 @@ where
 import Control.Concurrent.MVar
 import Control.Exception
 import Data.Aeson
-import Data.Aeson.KeyMap (insert)
+import Data.Aeson.KeyMap (fromList, insert)
 import Data.ByteString.Lazy.Char8 (hPutStrLn)
 import Data.Coerce
 import Data.IORef
@@ -49,13 +50,17 @@ newJSONEvent ::
   (Object -> IO ()) ->
   RenderExJSON stex ->
   RenderFieldJSON f ->
+  -- | Parent
+  Maybe JSONRef ->
+  -- | Causes
+  [JSONRef] ->
+  -- | Initial fields
+  [f] ->
   IO (Event IO JSONRef f)
-newJSONEvent emit renderEx renderField = do
+newJSONEvent emit renderEx renderField parent causes initialFields = do
   eventRef <- coerce nextRandom
   start <- getCurrentTime
-  fieldsRef <- newIORef mempty
-  parentsRef <- newIORef mempty
-  proximatesRef <- newIORef mempty
+  fieldsRef <- newIORef . fromList $ map renderField initialFields
   finishOnce <- newEmptyMVar
   let finish r =
         tryPutMVar finishOnce () >>= \case
@@ -63,16 +68,14 @@ newJSONEvent emit renderEx renderField = do
           True -> do
             end <- getCurrentTime
             fields <- readIORef fieldsRef
-            parents <- readIORef parentsRef
-            proximates <- readIORef proximatesRef
             emit
               ( "event-id" .= eventRef
                   <> "start" .= start
                   <> "end" .= end
                   <> "duration" .= diffUTCTime end start
                   <> ifNotNull "fields" fields
-                  <> ifNotNull "parents" parents
-                  <> ifNotNull "proximate-causes" proximates
+                  <> ifNotNull "parent" parent
+                  <> ifNotNull "proximate-causes" causes
                   <> case r of
                     StructuredFail e -> "structured-exception" .= renderEx e
                     UnstructuredFail e -> "unstructured-exception" .= show e
@@ -84,11 +87,6 @@ newJSONEvent emit renderEx renderField = do
         addField = \field ->
           atomicModifyIORef' fieldsRef \fields ->
             (uncurry insert (renderField field) fields, ()),
-        addReference = \(Reference ty r) ->
-          let refsRef = case ty of
-                Parent -> parentsRef
-                Proximate -> proximatesRef
-           in atomicModifyIORef' refsRef \refs -> (r : refs, ()),
         finalize = \me -> finish $ case me of
           Just e -> case fromException e of
             Just se -> StructuredFail se
@@ -119,12 +117,14 @@ jsonHandleBackend h renderEx renderSel = do
   let emit :: Object -> IO ()
       emit o = withMVar outputLock \() ->
         hPutStrLn h $ encode o
-  pure $
-    EventBackend
-      { newEvent = \sel -> do
-          let (k, renderField) = renderSel sel
-          newJSONEvent (emit . (k .=)) renderEx renderField
-      }
+      eb =
+        EventBackend
+          { newEvent = \(NewEventArgs {..}) -> do
+              let (k, renderField) = renderSel newEventSelector
+              newJSONEvent (emit . (k .=)) renderEx renderField newEventParent newEventCauses newEventInitialFields,
+            emitImmediateEvent = fmap reference . newEvent eb
+          }
+  pure eb
 
 -- | An 'EventBackend' which posts events to @stderr@ as JSON.
 --

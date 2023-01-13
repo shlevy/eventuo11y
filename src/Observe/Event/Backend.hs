@@ -15,8 +15,8 @@ module Observe.Event.Backend
   ( -- * Core interface
     EventBackend (..),
     Event (..),
-    Reference (..),
-    ReferenceType (..),
+    NewEventArgs (..),
+    simpleNewEventArgs,
 
     -- * Backend composition
     unitEventBackend,
@@ -30,20 +30,15 @@ module Observe.Event.Backend
     injectSelector,
     idInjectSelector,
     narrowEventBackend,
-    setDefaultReferenceEventBackend,
     setAncestorEventBackend,
     setInitialCauseEventBackend,
-    setReferenceEventBackend,
-    setParentEventBackend,
-    setProximateEventBackend,
   )
 where
 
+import Control.Applicative
 import Control.Exception
-import Control.Monad
-import Control.Monad.Primitive
+import Control.Monad.Zip
 import Data.Functor
-import Data.Primitive.MVar
 
 -- | An instrumentation event.
 --
@@ -58,7 +53,8 @@ import Data.Primitive.MVar
 data Event m r f = Event
   { -- | Obtain a reference to an 'Event'.
     --
-    -- References are used to link 'Event's together, via 'addReference'.
+    -- References are used to link 'Event's together, via the 'newEventParent'
+    -- and 'newEventCauses' fields of 'NewEventArgs'.
     --
     -- References can live past when an event has been 'finalize'd.
     --
@@ -79,8 +75,6 @@ data Event m r f = Event
     -- within an instrumented codebase (but see [DynamicField](https://hackage.haskell.org/package/eventuo11y-json/docs/Observe-Event-Dynamic.html#t:DynamicField)
     -- for a generic option).
     addField :: !(f -> m ()),
-    -- | Relate another 'Event' to this 'Event' in the specified way
-    addReference :: !(Reference r -> m ()),
     -- | Mark an 'Event' as finished, perhaps due to an 'Exception'.
     --
     -- In normal usage, this should be automatically called via the use of
@@ -88,8 +82,8 @@ data Event m r f = Event
     --
     -- This is a no-op if the 'Event' has already been 'finalize'd.
     -- As a result, it is likely pointless to call
-    -- 'addField' or 'addReference' (or v'Observe.Event.addParent' / v'Observe.Event.addProximate')
-    -- after this call, though it still may be reasonable to call 'reference'.
+    -- 'addField' after this call, though it still may be reasonable to call
+    -- 'reference'.
     finalize :: !(Maybe SomeException -> m ())
   }
 
@@ -98,20 +92,8 @@ hoistEvent :: (forall x. m x -> n x) -> Event m r f -> Event n r f
 hoistEvent nt ev =
   ev
     { addField = nt . addField ev,
-      addReference = nt . addReference ev,
       finalize = nt . finalize ev
     }
-
--- | Ways in which 'Event's can 'Reference' each other.
-data ReferenceType
-  = -- | The 'Reference'd 'Event' is a parent of this 'Event'.
-    Parent
-  | -- | The 'Reference'd 'Event' is a proximate cause of this 'Event'.
-    Proximate
-  deriving stock (Eq)
-
--- | A reference to another 'Event'
-data Reference r = Reference !ReferenceType !r
 
 -- | A backend for creating t'Event's.
 --
@@ -120,12 +102,7 @@ data Reference r = Reference !ReferenceType !r
 -- 'Observe.Event.pairEventBackend'.
 --
 -- A simple 'EventBackend' for logging to a t'System.IO.Handle' can be
--- created with 'Observe.Event.Render.IO.JSON.jsonHandleBackend'.
---
--- Typically the entrypoint for some eventuo11y-instrumented code will
--- take an 'EventBackend', polymorphic in @r@ and possibly @m@. Calling
--- code can use 'Observe.Event.subEventBackend' to place the resulting
--- events in its hierarchy.
+-- created with [jsonHandleBackend](https://hackage.haskell.org/package/eventuo11y-json/docs/Observe-Event-Render-JSON-Handle.html#v:jsonHandleBackend).
 --
 -- From an 'EventBackend', new events can be created via selectors
 -- (of type @s f@ for some field type @f@), typically with the
@@ -140,30 +117,64 @@ data Reference r = Reference !ReferenceType !r
 -- functionality within an instrumented codebase, implemented as a GADT
 -- (but see [DynamicEventSelector](https://hackage.haskell.org/package/eventuo11y-json/docs/Observe-Event-Dynamic.html#t:DynamicEventSelector) for a generic option).
 --
--- Implementations must ensure that 'EventBackend's and their underlying t'Observe.Event.Event's
+-- Implementations must ensure that 'EventBackend's and their underlying t'Event's
 -- are safe to use across threads.
 --
 -- [@m@]: The monad we're instrumenting in.
--- [@r@]: The type of event references used in this 'EventBackend'. See 'Observe.Event.reference'.
--- [@s@]: The type of event selectors. See 'newEvent'.
-newtype EventBackend m r s = EventBackend
-  { -- | Create a new 'Event', selected by the given selector.
+-- [@r@]: The type of event references used in this 'EventBackend'. See 'reference'.
+-- [@s@]: The type of event selectors. See 'newEventSelector'.
+data EventBackend m r s = EventBackend
+  { -- | Create a new 'Event', specified by the given arguments.
     --
-    -- The selector specifies the category of new event we're creating, as well
-    -- as the type of fields that can be added to it (with 'addField').
+    -- Consider the [resource-safe event allocation functions](Observe-Event.html#g:resourcesafe) instead
+    -- of calling this directly.
+    newEvent :: forall f. NewEventArgs r s f -> m (Event m r f),
+    -- | Create an event which has no duration and is immediately finalized
+    -- successfully.
+    --
+    -- Returns a reference to the event.
+    emitImmediateEvent :: forall f. NewEventArgs r s f -> m r
+  }
+
+-- | Arguments specifying how an 'Event' should be created.
+--
+-- See 'simpleNewEventArgs' for a simple case.
+data NewEventArgs r s f = NewEventArgs
+  { -- | The selector specifying the category of new 'Event' we're creating,
+    -- as well as the type of fields that can be added to it (with 'addField').
     --
     -- Selectors are intended to be of a domain specific type per unit of
     -- functionality within an instrumented codebase, implemented as a GADT
     -- (but see [DynamicEventSelector](https://hackage.haskell.org/package/eventuo11y-json/docs/Observe-Event-Dynamic.html#t:DynamicEventSelector) for a generic option).
+    newEventSelector :: !(s f),
+    -- | The parent of the new 'Event', if any.
     --
-    -- Consider the [resource-safe event allocation functions](Observe-Event.html#g:resourcesafe) instead
-    -- of calling this directly.
-    newEvent ::
-      forall f.
-      -- The event selector.
-      s f ->
-      m (Event m r f)
+    -- Typically handled automatically via v'Observe.Event.withEvent'.
+    newEventParent :: !(Maybe r),
+    -- | The proximate causes of the new 'Event', if any.
+    newEventCauses :: ![r],
+    -- | Fields set at the creation of the 'Event'.
+    --
+    -- See 'addField'.
+    newEventInitialFields :: ![f]
   }
+
+-- | 'NewEventArgs' from a given selector, with no initial fields or explicit references.
+--
+-- The selector specifies the category of new 'Event' we're creating,
+-- as well as the type of fields that can be added to it (with 'addField').
+--
+-- Selectors are intended to be of a domain specific type per unit of
+-- functionality within an instrumented codebase, implemented as a GADT
+-- (but see [DynamicEventSelector](https://hackage.haskell.org/package/eventuo11y-json/docs/Observe-Event-Dynamic.html#t:DynamicEventSelector) for a generic option).
+simpleNewEventArgs :: s f -> NewEventArgs r s f
+simpleNewEventArgs sel =
+  NewEventArgs
+    { newEventSelector = sel,
+      newEventParent = Nothing,
+      newEventCauses = [],
+      newEventInitialFields = []
+    }
 
 -- | A no-op 'EventBackend'.
 --
@@ -181,18 +192,36 @@ unitEventBackend = noopEventBackend ()
 pairEventBackend :: Applicative m => EventBackend m a s -> EventBackend m b s -> EventBackend m (a, b) s
 pairEventBackend x y =
   EventBackend
-    { newEvent = \sel -> do
-        xEv <- newEvent x sel
-        yEv <- newEvent y sel
+    { newEvent = \args -> do
+        let (xArgs, yArgs) = unzipArgs args
+        xEv <- newEvent x xArgs
+        yEv <- newEvent y yArgs
         pure $
           Event
             { reference = (reference xEv, reference yEv),
               addField = \f -> addField xEv f *> addField yEv f,
-              addReference = \(Reference ty (rx, ry)) ->
-                addReference xEv (Reference ty rx) *> addReference yEv (Reference ty ry),
               finalize = \me -> finalize xEv me *> finalize yEv me
-            }
+            },
+      emitImmediateEvent = \args -> do
+        let (xArgs, yArgs) = unzipArgs args
+        xRef <- emitImmediateEvent x xArgs
+        yRef <- emitImmediateEvent y yArgs
+        pure $ (xRef, yRef)
     }
+  where
+    unzipArgs args =
+      ( args
+          { newEventParent = xParent,
+            newEventCauses = xCauses
+          },
+        args
+          { newEventParent = yParent,
+            newEventCauses = yCauses
+          }
+      )
+      where
+        (xParent, yParent) = munzip $ newEventParent args
+        (xCauses, yCauses) = munzip $ newEventCauses args
 
 -- | A no-op 'EventBackend' that can be integrated with other backends.
 --
@@ -209,9 +238,9 @@ noopEventBackend r =
           Event
             { reference = r,
               addField = const $ pure (),
-              addReference = const $ pure (),
               finalize = const $ pure ()
-            }
+            },
+      emitImmediateEvent = \_ -> pure r
     }
 
 -- | Hoist an 'EventBackend' along a given natural transformation into a new monad.
@@ -222,7 +251,8 @@ hoistEventBackend ::
   EventBackend n r s
 hoistEventBackend nt backend =
   EventBackend
-    { newEvent = nt . fmap (hoistEvent nt) . newEvent backend
+    { newEvent = nt . fmap (hoistEvent nt) . newEvent backend,
+      emitImmediateEvent = nt . emitImmediateEvent backend
     }
 
 -- | Inject a narrower selector and its fields into a wider selector.
@@ -250,70 +280,47 @@ narrowEventBackend ::
   EventBackend m r s
 narrowEventBackend inj backend =
   EventBackend
-    { newEvent = \sel -> inj sel \sel' injField ->
-        newEvent backend sel' <&> \ev ->
+    { newEvent = \args -> inj (newEventSelector args) \sel' injField ->
+        newEvent backend (transformArgs args sel' injField) <&> \ev ->
           ev
             { addField = addField ev . injField
-            }
+            },
+      emitImmediateEvent = \args -> inj (newEventSelector args) \sel' injField ->
+        emitImmediateEvent backend $ transformArgs args sel' injField
     }
-
--- | Transform an 'EventBackend' so all of its 'Event's have a given 'Reference'.
---
--- You likely want 'setDefaultReferenceEventBackend', if your monad supports it.
-setReferenceEventBackend :: (Monad m) => Reference r -> EventBackend m r s -> EventBackend m r s
-setReferenceEventBackend r backend =
-  EventBackend
-    { newEvent = \sel -> do
-        ev <- newEvent backend sel
-        addReference ev r
-        pure ev
-    }
-
--- | Transform an 'EventBackend' so all of its 'Event's have a given parent.
---
--- You likely want 'setAncestorEventBackend', if your monad supports it.
-setParentEventBackend :: (Monad m) => r -> EventBackend m r s -> EventBackend m r s
-setParentEventBackend = setReferenceEventBackend . Reference Parent
-
--- | Transform an 'EventBackend' so all of its 'Event's have a given proximate cause.
---
--- You likely want 'setInitialCauseEventBackend', if your monad supports it.
-setProximateEventBackend :: (Monad m) => r -> EventBackend m r s -> EventBackend m r s
-setProximateEventBackend = setReferenceEventBackend . Reference Proximate
-
--- | Transform an 'EventBackend' so all of its 'Event's have a given 'Reference', if they
--- haven't been given a 'Reference' of the same 'ReferenceType' by the time they are 'finalize'd.
---
--- See 'setReferenceEventBackend' if the 'Reference' should be applied unconditionally.
-setDefaultReferenceEventBackend :: (PrimMonad m) => Reference r -> EventBackend m r s -> EventBackend m r s
-setDefaultReferenceEventBackend ref@(Reference ty _) backend =
-  EventBackend
-    { newEvent = \sel -> do
-        flag <- newEmptyMVar
-        ev <- newEvent backend sel
-        pure $
-          ev
-            { addReference = \ref'@(Reference ty' _) -> do
-                when (ty' == ty) . void $ tryPutMVar flag ()
-                addReference ev ref',
-              finalize = \me -> do
-                tryPutMVar flag () >>= \case
-                  False -> pure ()
-                  True -> addReference ev ref
-                finalize ev me
-            }
-    }
+  where
+    transformArgs args sel' injField =
+      args
+        { newEventSelector = sel',
+          newEventInitialFields = injField <$> newEventInitialFields args
+        }
 
 -- | Transform an 'EventBackend' so all of its 'Event's have a given parent, if they
--- are not given another parent by the time they are 'finalize'd.
---
--- See 'setParentEventBackend' if the parent should be set unconditionally.
-setAncestorEventBackend :: (PrimMonad m) => r -> EventBackend m r s -> EventBackend m r s
-setAncestorEventBackend = setDefaultReferenceEventBackend . Reference Parent
+-- are not given another parent.
+setAncestorEventBackend :: r -> EventBackend m r s -> EventBackend m r s
+setAncestorEventBackend parent backend =
+  EventBackend
+    { newEvent = newEvent backend . transformArgs,
+      emitImmediateEvent = emitImmediateEvent backend . transformArgs
+    }
+  where
+    transformArgs args =
+      args
+        { newEventParent = newEventParent args <|> pure parent
+        }
 
--- | Transform an 'EventBackend' so all of its 'Event's have a given proximate cause,
--- if they are not given another proximate cause by the time they are 'finalize'd.
---
--- See 'setProximateEventBackend' if the proximate cause should be set unconditionally.
-setInitialCauseEventBackend :: (PrimMonad m) => r -> EventBackend m r s -> EventBackend m r s
-setInitialCauseEventBackend = setDefaultReferenceEventBackend . Reference Proximate
+-- | Transform an 'EventBackend' so all of its 'Event's have the given causes,
+-- if they are not given another set of causes.
+setInitialCauseEventBackend :: [r] -> EventBackend m r s -> EventBackend m r s
+setInitialCauseEventBackend causes backend =
+  EventBackend
+    { newEvent = newEvent backend . transformArgs,
+      emitImmediateEvent = emitImmediateEvent backend . transformArgs
+    }
+  where
+    transformArgs args =
+      args
+        { newEventCauses = case newEventCauses args of
+            [] -> causes
+            l -> l
+        }

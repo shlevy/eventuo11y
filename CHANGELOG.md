@@ -1,5 +1,16 @@
 # Revision history for eventuo11y
 
+## 0.7.0.0 -- 2023-01-13
+
+- Use `NewEventArgs` as the basic way to initialize a new `Event`.
+
+  This replaces `addReference`, requiring the parent and any
+  proximate causes to be specified up-front. If a use case for
+  multiple parents, or specifying parents/causes only after an
+  `Event` is live, is found, we can add it back.
+- Add `emitImmediateEvent` and `emitImmediateEvent'` as primitives for
+  events with no duration.
+
 ## 0.6.0.0 -- 2022-12-23
 
 - Add `MonadEvent` for implicit backend management
