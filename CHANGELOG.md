@@ -1,5 +1,9 @@
 # Revision history for eventuo11y
 
+## 0.7.1.0 -- 2023-01-14
+
+- Add `Observe.Event.Render.InMemory`
+
 ## 0.7.0.0 -- 2023-01-13
 
 - Use `NewEventArgs` as the basic way to initialize a new `Event`.
