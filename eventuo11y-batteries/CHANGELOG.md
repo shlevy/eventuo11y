@@ -1,5 +1,9 @@
 # Revision history for eventuo11y-batteries
 
+## 0.4.0.0 -- 2023-01-17
+
+- Fix `ClientM` to be usable as an `EventMonadKind`
+
 ## 0.3.0.2 -- 2023-01-17
 
 - Bump upper bound for `eventuo11y`

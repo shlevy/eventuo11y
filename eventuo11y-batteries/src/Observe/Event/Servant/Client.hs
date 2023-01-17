@@ -63,7 +63,10 @@ import Servant.Client.Core.Request
 import Servant.Client.Core.RunClient hiding (RunRequest)
 
 -- | A monad to use in place of 'S.ClientM' to get instrumentation on requests.
-type ClientM em r s = TransEventMonad (ReaderT (ClientEnv s)) (TransEventMonad (ExceptT ClientError) em) r s
+--
+-- Note that 'ClientM' is only 'RunClient' when the selector of the ambient 'EventBackend' is
+-- @s@, see the instance under 'ClientEnv'.
+type ClientM em s = TransEventMonad (ReaderT (ClientEnv s)) (TransEventMonad (ExceptT ClientError) em)
 
 -- | An instrumented 'S.ClientEnv'
 data ClientEnv s = ClientEnv
@@ -71,7 +74,7 @@ data ClientEnv s = ClientEnv
     injectRunRequest :: !(InjectSelector RunRequest s)
   }
 
-instance (MonadIO (em r s), MonadWithEvent em) => RunClient (ClientM em r s) where
+instance (MonadIO (em r s), MonadWithEvent em) => RunClient (ClientM em s r s) where
   runRequestAcceptStatus stats req = do
     e <- ask
     injectRunRequest e RunRequest \runReq injField -> withEvent runReq \ev -> do
@@ -82,7 +85,7 @@ instance (MonadIO (em r s), MonadWithEvent em) => RunClient (ClientM em r s) whe
   throwClientError = throwError
 
 -- | Instrumented version of 'S.runClientM'
-runClientM :: ClientM em r s a -> ClientEnv s -> em r s (Either ClientError a)
+runClientM :: ClientM em s r s' a -> ClientEnv s -> em r s' (Either ClientError a)
 runClientM = coerce
 
 -- | Selector for events in 'ClientM'
