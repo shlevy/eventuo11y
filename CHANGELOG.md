@@ -5,6 +5,7 @@
 - Add `childEvents` and `causedEvents` fields to `MemoryEvent`
 - `inMemoryBackend`: Notify the caller when a parentless, causeless event is created
 - Rename `when` to `eventTime` in `TimedEventAction`
+- Put `listInMemoryBackend` into `IO`
 
 ## 0.7.1.0 -- 2023-01-14
 

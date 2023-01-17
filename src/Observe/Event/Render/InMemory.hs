@@ -42,7 +42,6 @@ where
 
 import Control.Exception
 import Control.Monad
-import Control.Monad.IO.Class
 import Control.Monad.Primitive
 import Data.Kind
 import Data.Maybe
@@ -55,10 +54,9 @@ import Observe.Event.Backend
 -- The 'reference' of an 'Event' from this 'EventBackend' will be a 'MemoryEvent',
 -- which can be examined to extract information about the 'Event'.
 listInMemoryBackend ::
-  (PrimMonad m, MonadIO m) =>
   -- | Notify of an 'Event' with no parents or causes
-  (MemoryEvent m (ListAppendVector m) UTCTime s -> m ()) ->
-  EventBackend m (MemoryEvent m (ListAppendVector m) UTCTime s) s
+  (MemoryEvent IO (ListAppendVector IO) UTCTime s -> IO ()) ->
+  EventBackend IO (MemoryEvent IO (ListAppendVector IO) UTCTime s) s
 listInMemoryBackend = inMemoryBackend listInMemoryEffects
 
 -- | An 'EventBackend' whose 'Event's are essentially plain Haskell values.
@@ -183,11 +181,11 @@ hoistInMemoryEffects nt (InMemoryEffects {..}) =
     }
 
 -- | 'InMemoryEffects' based on 'listAppendVectorEffects' and 'ioTimestampEffects'.
-listInMemoryEffects :: (PrimMonad m, MonadIO m) => InMemoryEffects m (ListAppendVector m) UTCTime
+listInMemoryEffects :: InMemoryEffects IO (ListAppendVector IO) UTCTime
 listInMemoryEffects =
   InMemoryEffects
     { appendVectorEffects = listAppendVectorEffects,
-      timestampEffects = hoistTimestampEffects liftIO ioTimestampEffects
+      timestampEffects = ioTimestampEffects
     }
 
 -- | 'InMemoryEffects' based on 'listAppendVectorEffects' with meaningless timestamps.
