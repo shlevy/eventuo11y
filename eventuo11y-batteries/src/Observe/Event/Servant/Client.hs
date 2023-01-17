@@ -71,7 +71,7 @@ data ClientEnv s = ClientEnv
     injectRunRequest :: !(InjectSelector RunRequest s)
   }
 
-instance (MonadIO (em r s), MonadWithEvent em r s) => RunClient (ClientM em r s) where
+instance (MonadIO (em r s), MonadWithEvent em) => RunClient (ClientM em r s) where
   runRequestAcceptStatus stats req = do
     e <- ask
     injectRunRequest e RunRequest \runReq injField -> withEvent runReq \ev -> do

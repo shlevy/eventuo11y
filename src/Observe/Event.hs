@@ -152,7 +152,7 @@ emitImmediateEvent' args = do
 --
 -- The 'Event' will be 'finalize'd at the end of the nested action.
 withEvent ::
-  (MonadWithEvent em r s) =>
+  (MonadWithEvent em) =>
   forall f.
   s f ->
   (EnvEvent em r s f -> em r s a) ->
@@ -166,7 +166,7 @@ withEvent = withNarrowingEvent idInjectSelector
 --
 -- The 'Event' will be 'finalize'd at the end of the nested action.
 withEventArgs ::
-  (MonadWithEvent em r s) =>
+  (MonadWithEvent em) =>
   forall f.
   NewEventArgs r s f ->
   (EnvEvent em r s f -> em r s a) ->
@@ -188,7 +188,7 @@ withEventArgs = withNarrowingEventArgs idInjectSelector
 --
 -- The 'Event' will be 'finalize'd at the end of the nested action.
 withNarrowingEvent ::
-  (MonadWithEvent em r t) =>
+  (MonadWithEvent em) =>
   InjectSelector s t ->
   forall f.
   t f ->
@@ -204,7 +204,7 @@ withNarrowingEvent inj = withNarrowingEventArgs inj . simpleNewEventArgs
 --
 -- The 'Event' will be 'finalize'd at the end of the nested action.
 withNarrowingEventArgs ::
-  (MonadWithEvent em r t) =>
+  (MonadWithEvent em) =>
   InjectSelector s t ->
   forall f.
   NewEventArgs r t f ->
@@ -215,7 +215,9 @@ withNarrowingEventArgs inj args go = withBackendEvent args $ \ev -> do
   withModifiedBackend (narrowEventBackend inj . setAncestorEventBackend (reference ev)) $ go ev'
 
 -- | A 'MonadEvent' suitable for running the 'withEvent' family of functions
-type MonadWithEvent em r s = (MonadEvent em, MonadWithExceptable (em r s))
+class (MonadEvent em, forall r s. MonadWithExceptable (em r s)) => MonadWithEvent em
+
+instance (MonadEvent em, forall r s. MonadWithExceptable (em r s)) => MonadWithEvent em
 
 -- | Allocate a new 'Event', selected by the given selector.
 --

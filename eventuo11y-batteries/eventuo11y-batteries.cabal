@@ -1,6 +1,6 @@
 cabal-version:      3.0
 name:               eventuo11y-batteries
-version:            0.3.0.2
+version:            0.3.0.3
 synopsis:           Grab bag of eventuo11y-enriched functionality
 description:
   Miscellaneous helpers for instrumenting with [eventuo11y](https://hackage.haskell.org/package/eventuo11y) and 3rd-party packages.
@@ -31,8 +31,8 @@ library
     , bytestring           ^>= { 0.10, 0.11 }
     , case-insensitive     ^>= 1.2
     , containers           ^>= 0.6
-    , eventuo11y           ^>= { 0.6, 0.7, 0.8 }
-    , eventuo11y-json      ^>= { 0.2, 0.3 }
+    , eventuo11y           ^>= { 0.9 }
+    , eventuo11y-json      ^>= { 0.3 }
     , general-allocate     ^>= { 0.2 }
     , http-media           ^>= 0.8
     , http-types           ^>= 0.12

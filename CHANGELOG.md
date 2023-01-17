@@ -1,5 +1,9 @@
 # Revision history for eventuo11y
 
+## 0.9.0.0 -- 2023-01-17
+
+- Make `MonadWithEvent` require `MonadWithExceptable` for all `r` and `s`.
+
 ## 0.8.0.0 -- 2023-01-17
 
 - Add `childEvents` and `causedEvents` fields to `MemoryEvent`

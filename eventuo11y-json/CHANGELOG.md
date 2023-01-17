@@ -1,5 +1,9 @@
 # Revision history for eventuo11y-json
 
+## 0.3.0.2 -- 2023-01-17
+
+- Bump upper bound for `eventuo11y`
+
 ## 0.3.0.1 -- 2023-01-17
 
 - Bump upper bound for `eventuo11y`

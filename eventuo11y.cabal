@@ -1,6 +1,6 @@
 cabal-version:      3.0
 name:               eventuo11y
-version:            0.8.0.0
+version:            0.9.0.0
 synopsis:           An event-oriented observability library
 description:
   Instrument your Haskell codebase with wide, semantically meaningful events.
@@ -67,7 +67,7 @@ library
   build-depends:
     , base              ^>= { 4.14, 4.16, 4.17 }
     , exceptions        ^>= { 0.10 }
-    , general-allocate  ^>= { 0.2 }
+    , general-allocate  ^>= { 0.2 } && >= 0.2.1
     , primitive         ^>= { 0.7 }
     , time              ^>= { 1.11, 1.12 }
     , transformers      ^>= { 0.5, 0.6 }

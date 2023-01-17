@@ -19,3 +19,9 @@ package eventuo11y-json
   ghc-options: -Wall
 
 extra-packages: temporary
+
+source-repository-package
+  type: git
+  location: https://github.com/shlevy/general-allocate
+  tag: v0.2.1.1
+  --sha256: 055b5l834nx0zac7nm10l4679swh5xxb5g1rfqsnaclczzh8ch2p

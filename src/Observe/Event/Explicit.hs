@@ -1,5 +1,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE RankNTypes #-}
+-- See https://gitlab.haskell.org/ghc/ghc/-/issues/16478
+{-# OPTIONS_GHC -Wno-simplifiable-class-constraints #-}
 
 -- |
 -- Description : Instrumentation with explicit 'EventBackend' passing

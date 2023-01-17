@@ -23,7 +23,6 @@
         "dlist".flags.werror = false;
         "text".revision = (((hackage."text")."1.2.5.0").revisions).default;
         "data-array-byte".revision = (((hackage."data-array-byte")."0.1.0.1").revisions).default;
-        "general-allocate".revision = (((hackage."general-allocate")."0.2.0.1").revisions).default;
         "entropy".revision = (((hackage."entropy")."0.4.1.10").revisions).default;
         "entropy".flags.donotgetentropy = false;
         "array".revision = (((hackage."array")."0.5.4.0").revisions).default;
@@ -284,6 +283,7 @@
   extras = hackage:
     {
       packages = {
+        general-allocate = ./.plan.nix/general-allocate.nix;
         eventuo11y = ./.plan.nix/eventuo11y.nix;
         eventuo11y-batteries = ./.plan.nix/eventuo11y-batteries.nix;
         eventuo11y-dsl = ./.plan.nix/eventuo11y-dsl.nix;
@@ -295,6 +295,7 @@
     ({ lib, ... }:
       {
         packages = {
+          "general-allocate" = { flags = {}; };
           "eventuo11y" = { flags = {}; };
           "eventuo11y-batteries" = { flags = {}; };
           "eventuo11y-dsl" = { flags = {}; };

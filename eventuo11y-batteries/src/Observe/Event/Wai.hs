@@ -61,7 +61,7 @@ type Application em r s = Request -> (Response -> em r s ResponseReceived) -> em
 
 -- | Run an 'Application' with generic 'Request'/'Response' instrumentation.
 application ::
-  (MonadUnliftIO (em r s), MonadWithEvent em r s) =>
+  (MonadUnliftIO (em r s), MonadWithEvent em) =>
   InjectSelector ServeRequest s ->
   Application em r s ->
   em r s W.Application
@@ -106,7 +106,7 @@ type OnExceptionCallback em r s = Maybe Request -> SomeException -> em r s ()
 -- use 'vault', but there doesn't seem to be a way to get at the 'Request' that Warp will pass
 -- here.
 onExceptionCallback ::
-  (MonadUnliftIO (em r s), MonadWithEvent em r s) =>
+  (MonadUnliftIO (em r s), MonadWithEvent em) =>
   InjectSelector OnException s ->
   OnExceptionCallback em r s ->
   em r s (Maybe Request -> SomeException -> IO ())
