@@ -1,5 +1,9 @@
 # Revision history for eventuo11y
 
+## 0.7.2.0 -- 2023-01-17
+
+- Add `childEvents` and `causedEvents` fields to `MemoryEvent`
+
 ## 0.7.1.0 -- 2023-01-14
 
 - Add `Observe.Event.Render.InMemory`

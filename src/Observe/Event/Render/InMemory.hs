@@ -43,6 +43,7 @@ where
 import Control.Exception
 import Control.Monad.IO.Class
 import Control.Monad.Primitive
+import Data.Foldable
 import Data.Kind
 import Data.Primitive.MutVar
 import Data.Time.Clock
@@ -75,19 +76,29 @@ inMemoryBackend InMemoryEffects {..} =
     { newEvent = \initArgs -> do
         start <- getTimestamp
         dynamicValues <- newVector
+        childEvents <- newVector
+        causedEvents <- newVector
+        let reference = MemoryEvent {dynamicValues = Just dynamicValues, ..}
+        traverse_ (\(MemoryEvent {childEvents = cevs}) -> appendVector cevs reference) $
+          newEventParent initArgs
+        traverse_ (\(MemoryEvent {causedEvents = cevs}) -> appendVector cevs reference) $
+          newEventCauses initArgs
         pure $
           Event
-            { reference = MemoryEvent {dynamicValues = Just dynamicValues, ..},
-              addField = \f -> do
+            { addField = \f -> do
                 when <- getTimestamp
                 appendVector dynamicValues $ TimedEventAction {act = AddField f, ..},
               finalize = \me -> do
                 when <- getTimestamp
-                appendVector dynamicValues $ TimedEventAction {act = Finalize me, ..}
+                appendVector dynamicValues $ TimedEventAction {act = Finalize me, ..},
+              ..
             },
       emitImmediateEvent = \initArgs -> do
         start <- getTimestamp
-        pure $ MemoryEvent {dynamicValues = Nothing, ..}
+        let dynamicValues = Nothing
+        childEvents <- newVector
+        causedEvents <- newVector
+        pure $ MemoryEvent {..}
     }
   where
     AppendVectorEffects {..} = appendVectorEffects
@@ -107,7 +118,11 @@ data MemoryEvent m appvec ts s = forall f.
     -- | Event information added during the event's lifecycle
     --
     -- 'Nothing' if this was the result of 'emitImmediateEvent' and thus had no lifecycle
-    dynamicValues :: !(Maybe (appvec (TimedEventAction ts f)))
+    dynamicValues :: !(Maybe (appvec (TimedEventAction ts f))),
+    -- | Direct children of this event
+    childEvents :: !(appvec (MemoryEvent m appvec ts s)),
+    -- | Events directly caused by this event
+    causedEvents :: !(appvec (MemoryEvent m appvec ts s))
   }
 
 -- | An action that occurred during an 'Event' at some time.
