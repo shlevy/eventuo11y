@@ -1,8 +1,10 @@
 # Revision history for eventuo11y
 
-## 0.7.2.0 -- 2023-01-17
+## 0.8.0.0 -- 2023-01-17
 
 - Add `childEvents` and `causedEvents` fields to `MemoryEvent`
+- `inMemoryBackend`: Notify the caller when a parentless, causeless event is created
+- Rename `when` to `eventTime` in `TimedEventAction`
 
 ## 0.7.1.0 -- 2023-01-14
 

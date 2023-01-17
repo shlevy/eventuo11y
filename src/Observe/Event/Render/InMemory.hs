@@ -41,10 +41,11 @@ module Observe.Event.Render.InMemory
 where
 
 import Control.Exception
+import Control.Monad
 import Control.Monad.IO.Class
 import Control.Monad.Primitive
-import Data.Foldable
 import Data.Kind
+import Data.Maybe
 import Data.Primitive.MutVar
 import Data.Time.Clock
 import Observe.Event.Backend
@@ -53,14 +54,22 @@ import Observe.Event.Backend
 --
 -- The 'reference' of an 'Event' from this 'EventBackend' will be a 'MemoryEvent',
 -- which can be examined to extract information about the 'Event'.
-listInMemoryBackend :: (PrimMonad m, MonadIO m) => EventBackend m (MemoryEvent m (ListAppendVector m) UTCTime s) s
+listInMemoryBackend ::
+  (PrimMonad m, MonadIO m) =>
+  -- | Notify of an 'Event' with no parents or causes
+  (MemoryEvent m (ListAppendVector m) UTCTime s -> m ()) ->
+  EventBackend m (MemoryEvent m (ListAppendVector m) UTCTime s) s
 listInMemoryBackend = inMemoryBackend listInMemoryEffects
 
 -- | An 'EventBackend' whose 'Event's are essentially plain Haskell values.
 --
 -- The 'reference' of an 'Event' from this 'EventBackend' will be a 'MemoryEvent',
 -- which can be examined to extract information about the 'Event'.
-timelessListInMemoryBackend :: (PrimMonad m) => EventBackend m (MemoryEvent m (ListAppendVector m) () s) s
+timelessListInMemoryBackend ::
+  (PrimMonad m) =>
+  -- | Notify of an 'Event' with no parents or causes
+  (MemoryEvent m (ListAppendVector m) () s -> m ()) ->
+  EventBackend m (MemoryEvent m (ListAppendVector m) () s) s
 timelessListInMemoryBackend = inMemoryBackend timelessListInMemoryEffects
 
 -- | An 'EventBackend' whose 'Event's are essentially plain Haskell values.
@@ -70,8 +79,13 @@ timelessListInMemoryBackend = inMemoryBackend timelessListInMemoryEffects
 --
 -- [@appvec@]: An append-only vector type, see 'AppendVectorEffects'
 -- [@ts@]: A timestamp, see 'TimestampEffects'
-inMemoryBackend :: (Monad m) => InMemoryEffects m appvec ts -> EventBackend m (MemoryEvent m appvec ts s) s
-inMemoryBackend InMemoryEffects {..} =
+inMemoryBackend ::
+  (Monad m) =>
+  InMemoryEffects m appvec ts ->
+  -- | Notify of an 'Event' with no parents or causes
+  (MemoryEvent m appvec ts s -> m ()) ->
+  EventBackend m (MemoryEvent m appvec ts s) s
+inMemoryBackend (InMemoryEffects {..}) emitDisconnectedEvent =
   EventBackend
     { newEvent = \initArgs -> do
         start <- getTimestamp
@@ -79,17 +93,24 @@ inMemoryBackend InMemoryEffects {..} =
         childEvents <- newVector
         causedEvents <- newVector
         let reference = MemoryEvent {dynamicValues = Just dynamicValues, ..}
-        traverse_ (\(MemoryEvent {childEvents = cevs}) -> appendVector cevs reference) $
-          newEventParent initArgs
-        traverse_ (\(MemoryEvent {causedEvents = cevs}) -> appendVector cevs reference) $
-          newEventCauses initArgs
+        hasParents <-
+          isJust
+            <$> traverse
+              (\(MemoryEvent {childEvents = cevs}) -> appendVector cevs reference)
+              (newEventParent initArgs)
+        hasCauses <-
+          not . null
+            <$> traverse
+              (\(MemoryEvent {causedEvents = cevs}) -> appendVector cevs reference)
+              (newEventCauses initArgs)
+        unless (hasParents || hasCauses) $ emitDisconnectedEvent reference
         pure $
           Event
             { addField = \f -> do
-                when <- getTimestamp
+                eventTime <- getTimestamp
                 appendVector dynamicValues $ TimedEventAction {act = AddField f, ..},
               finalize = \me -> do
-                when <- getTimestamp
+                eventTime <- getTimestamp
                 appendVector dynamicValues $ TimedEventAction {act = Finalize me, ..},
               ..
             },
@@ -130,7 +151,7 @@ data MemoryEvent m appvec ts s = forall f.
 -- [@ts@]: A timestamp, see 'TimestampEffects'
 data TimedEventAction ts f = TimedEventAction
   { -- | When the event occurred
-    when :: !ts,
+    eventTime :: !ts,
     -- | The action that occurred
     act :: !(EventAction f)
   }

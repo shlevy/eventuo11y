@@ -1,5 +1,9 @@
 # Revision history for eventuo11y-batteries
 
+## 0.3.0.2 -- 2023-01-17
+
+- Bump upper bound for `eventuo11y`
+
 ## 0.3.0.1 -- 2023-01-13
 
 - Builds with eventuo11y 0.7 and eventuo11y-json 0.3

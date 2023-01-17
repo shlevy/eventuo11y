@@ -11,7 +11,7 @@
     flags = {};
     package = {
       specVersion = "3.0";
-      identifier = { name = "eventuo11y"; version = "0.7.2.0"; };
+      identifier = { name = "eventuo11y"; version = "0.8.0.0"; };
       license = "Apache-2.0";
       copyright = "Copyright 2022 Shea Levy.";
       maintainer = "shea@shealevy.com";
