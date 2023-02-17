@@ -12,6 +12,7 @@
         dlist.flags.werror = false;
         exceptions.revision = (((hackage.exceptions)."0.10.4").revisions).default;
         directory.revision = (((hackage.directory)."1.3.6.2").revisions).default;
+        general-allocate.revision = import ./cabal-files/general-allocate.nix;
         http-api-data.revision = import ./cabal-files/http-api-data.nix;
         http-api-data.flags.use-text-show = false;
         vector-stream.revision = import ./cabal-files/vector-stream.nix;
@@ -61,6 +62,7 @@
         memory.flags.support_deepseq = true;
         memory.flags.support_bytestring = true;
         constraints.revision = import ./cabal-files/constraints.nix;
+        http-client-tls.revision = import ./cabal-files/http-client-tls.nix;
         parsec.revision = (((hackage.parsec)."3.1.15.0").revisions).default;
         streaming-commons.revision = import ./cabal-files/streaming-commons.nix;
         streaming-commons.flags.use-bytestring-builder = false;
@@ -77,6 +79,7 @@
         integer-logarithms.flags.integer-gmp = true;
         strict.revision = import ./cabal-files/strict.nix;
         strict.flags.assoc = true;
+        x509-system.revision = import ./cabal-files/x509-system.nix;
         base-compat.revision = import ./cabal-files/base-compat.nix;
         aeson.revision = import ./cabal-files/aeson.nix;
         aeson.flags.ordered-keymap = true;
@@ -108,7 +111,9 @@
         semigroups.flags.text = true;
         semigroups.flags.hashable = true;
         hs-opentelemetry-api.revision = import ./cabal-files/hs-opentelemetry-api.nix;
+        socks.revision = import ./cabal-files/socks.nix;
         OneTuple.revision = import ./cabal-files/OneTuple.nix;
+        x509-store.revision = import ./cabal-files/x509-store.nix;
         network-uri.revision = import ./cabal-files/network-uri.nix;
         base.revision = (((hackage.base)."4.16.4.0").revisions).default;
         time.revision = (((hackage.time)."1.11.1.1").revisions).default;
@@ -123,7 +128,13 @@
         uuid-types.revision = import ./cabal-files/uuid-types.nix;
         bsb-http-chunked.revision = import ./cabal-files/bsb-http-chunked.nix;
         case-insensitive.revision = import ./cabal-files/case-insensitive.nix;
+        cereal.revision = import ./cabal-files/cereal.nix;
+        cereal.flags.bytestring-builder = false;
         cookie.revision = import ./cabal-files/cookie.nix;
+        tls.revision = import ./cabal-files/tls.nix;
+        tls.flags.network = true;
+        tls.flags.hans = false;
+        tls.flags.compat = true;
         th-abstraction.revision = import ./cabal-files/th-abstraction.nix;
         hsc2hs.revision = import ./cabal-files/hsc2hs.nix;
         hsc2hs.flags.in-ghc-tree = false;
@@ -196,6 +207,9 @@
         byteorder.revision = import ./cabal-files/byteorder.nix;
         transformers.revision = (((hackage.transformers)."0.5.6.2").revisions).default;
         servant.revision = import ./cabal-files/servant.nix;
+        connection.revision = import ./cabal-files/connection.nix;
+        atomic-primops.revision = import ./cabal-files/atomic-primops.nix;
+        atomic-primops.flags.debug = false;
         indexed-traversable.revision = import ./cabal-files/indexed-traversable.nix;
         these.revision = import ./cabal-files/these.nix;
         these.flags.assoc = true;
@@ -230,6 +244,7 @@
         vector.flags.wall = false;
         vector.flags.boundschecks = true;
         vector.flags.unsafechecks = false;
+        x509-validation.revision = import ./cabal-files/x509-validation.nix;
         thread-utils-finalizers.revision = import ./cabal-files/thread-utils-finalizers.nix;
         comonad.revision = import ./cabal-files/comonad.nix;
         comonad.flags.containers = true;
@@ -238,6 +253,7 @@
         semialign.revision = import ./cabal-files/semialign.nix;
         semialign.flags.semigroupoids = true;
         mime-types.revision = import ./cabal-files/mime-types.nix;
+        prometheus.revision = import ./cabal-files/prometheus.nix;
         warp.revision = import ./cabal-files/warp.nix;
         warp.flags.network-bytestring = false;
         warp.flags.x509 = true;
@@ -283,7 +299,7 @@
   extras = hackage:
     {
       packages = {
-        general-allocate = ./.plan.nix/general-allocate.nix;
+        eventuo11y-prometheus = ./.plan.nix/eventuo11y-prometheus.nix;
         eventuo11y = ./.plan.nix/eventuo11y.nix;
         eventuo11y-batteries = ./.plan.nix/eventuo11y-batteries.nix;
         eventuo11y-dsl = ./.plan.nix/eventuo11y-dsl.nix;
@@ -295,7 +311,7 @@
     ({ lib, ... }:
       {
         packages = {
-          "general-allocate" = { flags = {}; };
+          "eventuo11y-prometheus" = { flags = {}; };
           "eventuo11y" = { flags = {}; };
           "eventuo11y-batteries" = { flags = {}; };
           "eventuo11y-dsl" = { flags = {}; };
@@ -306,13 +322,16 @@
     ({ lib, ... }:
       {
         packages = {
+          "http-client-tls".components.library.planned = lib.mkOverride 900 true;
           "string-conversions".components.library.planned = lib.mkOverride 900 true;
           "invariant".components.library.planned = lib.mkOverride 900 true;
           "transformers-base".components.library.planned = lib.mkOverride 900 true;
           "base-orphans".components.library.planned = lib.mkOverride 900 true;
           "servant".components.library.planned = lib.mkOverride 900 true;
+          "socks".components.library.planned = lib.mkOverride 900 true;
           "cookie".components.library.planned = lib.mkOverride 900 true;
           "these".components.library.planned = lib.mkOverride 900 true;
+          "cereal".components.library.planned = lib.mkOverride 900 true;
           "resourcet".components.library.planned = lib.mkOverride 900 true;
           "http2".components.library.planned = lib.mkOverride 900 true;
           "filepath".components.library.planned = lib.mkOverride 900 true;
@@ -366,6 +385,7 @@
           "adjunctions".components.library.planned = lib.mkOverride 900 true;
           "cryptonite".components.library.planned = lib.mkOverride 900 true;
           "asn1-parse".components.library.planned = lib.mkOverride 900 true;
+          "prometheus".components.library.planned = lib.mkOverride 900 true;
           "type-equality".components.library.planned = lib.mkOverride 900 true;
           "network-byte-order".components.library.planned = lib.mkOverride 900 true;
           "mime-types".components.library.planned = lib.mkOverride 900 true;
@@ -376,6 +396,7 @@
           "http-api-data".components.library.planned = lib.mkOverride 900 true;
           "network".components.library.planned = lib.mkOverride 900 true;
           "psqueues".components.library.planned = lib.mkOverride 900 true;
+          "eventuo11y-prometheus".components.library.planned = lib.mkOverride 900 true;
           "bsb-http-chunked".components.library.planned = lib.mkOverride 900 true;
           "StateVar".components.library.planned = lib.mkOverride 900 true;
           "case-insensitive".components.library.planned = lib.mkOverride 900 true;
@@ -383,6 +404,7 @@
           "cryptohash-sha1".components.library.planned = lib.mkOverride 900 true;
           "free".components.library.planned = lib.mkOverride 900 true;
           "unix-compat".components.library.planned = lib.mkOverride 900 true;
+          "x509-store".components.library.planned = lib.mkOverride 900 true;
           "blaze-builder".components.library.planned = lib.mkOverride 900 true;
           "asn1-types".components.library.planned = lib.mkOverride 900 true;
           "unliftio-core".components.library.planned = lib.mkOverride 900 true;
@@ -419,10 +441,13 @@
           "iproute".components.library.planned = lib.mkOverride 900 true;
           "servant-client".components.library.planned = lib.mkOverride 900 true;
           "th-compat".components.library.planned = lib.mkOverride 900 true;
+          "tls".components.library.planned = lib.mkOverride 900 true;
           "http-types".components.library.planned = lib.mkOverride 900 true;
+          "atomic-primops".components.library.planned = lib.mkOverride 900 true;
           "QuickCheck".components.library.planned = lib.mkOverride 900 true;
           "uuid-types".components.library.planned = lib.mkOverride 900 true;
           "semigroupoids".components.library.planned = lib.mkOverride 900 true;
+          "x509-validation".components.library.planned = lib.mkOverride 900 true;
           "singleton-bool".components.library.planned = lib.mkOverride 900 true;
           "attoparsec".components.library.planned = lib.mkOverride 900 true;
           "mtl".components.library.planned = lib.mkOverride 900 true;
@@ -455,6 +480,7 @@
           "time-compat".components.library.planned = lib.mkOverride 900 true;
           "basement".components.library.planned = lib.mkOverride 900 true;
           "aeson".components.library.planned = lib.mkOverride 900 true;
+          "x509-system".components.library.planned = lib.mkOverride 900 true;
           "hourglass".components.library.planned = lib.mkOverride 900 true;
           "base-compat".components.library.planned = lib.mkOverride 900 true;
           "eventuo11y-otel".components.library.planned = lib.mkOverride 900 true;
@@ -463,6 +489,7 @@
           "semigroups".components.library.planned = lib.mkOverride 900 true;
           "auto-update".components.library.planned = lib.mkOverride 900 true;
           "warp".components.library.planned = lib.mkOverride 900 true;
+          "connection".components.library.planned = lib.mkOverride 900 true;
           "void".components.library.planned = lib.mkOverride 900 true;
           };
         })
