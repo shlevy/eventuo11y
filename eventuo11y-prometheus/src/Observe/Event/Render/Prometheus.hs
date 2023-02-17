@@ -22,25 +22,47 @@ import Data.Map
 import Data.Traversable
 import Observe.Event.Backend
 import System.Metrics.Prometheus.Concurrent.Registry
-import System.Metrics.Prometheus.Metric.Histogram (UpperBound)
+import qualified System.Metrics.Prometheus.Metric.Counter as P
+import qualified System.Metrics.Prometheus.Metric.Gauge as P
+import qualified System.Metrics.Prometheus.Metric.Histogram as P
 import System.Metrics.Prometheus.MetricId
+import Prelude hiding (lookup)
 
 -- | An 'EventBackend' that populates a 'Registry'.
 --
 -- All metrics are registered before the backend is returned.
 prometheusEventBackend :: forall m es s. (MonadIO m, EventMetrics es) => Registry -> RenderSelectorPrometheus s es -> m (EventBackend m PrometheusReference s)
 prometheusEventBackend registry render = do
-  _counters <- fmap fromAscList . for [minBound @(Counter es) ..] $ \cId -> do
+  counters <- fmap fromAscList . for [minBound @(Counter es) ..] $ \cId -> do
     c <- liftIO $ registerCounter (metricName cId) (metricLabels cId) registry
     pure (cId, c)
-  _gauges <- fmap fromAscList . for [minBound @(Gauge es) ..] $ \gId -> do
+  gauges <- fmap fromAscList . for [minBound @(Gauge es) ..] $ \gId -> do
     g <- liftIO $ registerGauge (metricName gId) (metricLabels gId) registry
     pure (gId, g)
-  _histograms <- fmap fromAscList . for [minBound @(Histogram es) ..] $ \hId -> do
+  histograms <- fmap fromAscList . for [minBound @(Histogram es) ..] $ \hId -> do
     h <- liftIO $ registerHistogram (metricName hId) (metricLabels hId) (metricBounds hId) registry
     pure (hId, h)
-  let performModification :: MetricModification es -> m ()
-      performModification = \case {}
+  let (!@) :: (Ord k) => Map k a -> k -> m a
+      m !@ k = case lookup k m of
+        Just a -> pure a
+        Nothing -> liftIO $ throwIO NonExhaustiveMetricEnumeration
+
+      modifyCounter :: CounterModification -> P.Counter -> m ()
+      modifyCounter = \case {}
+
+      modifyGauge :: GaugeModification -> P.Gauge -> m ()
+      modifyGauge = \case {}
+
+      modifyHistogram :: HistogramModification -> P.Histogram -> m ()
+      modifyHistogram = \case {}
+
+      performModification (ModifyCounter modC cId) =
+        counters !@ cId >>= modifyCounter modC
+      performModification (ModifyGauge modG gId) =
+        gauges !@ gId >>= modifyGauge modG
+      performModification (ModifyHistogram modH hId) =
+        histograms !@ hId >>= modifyHistogram modH
+
       performModifications = traverse_ performModification
   pure $
     EventBackend
@@ -91,7 +113,7 @@ class (Ord a, Enum a, Bounded a) => EventMetric a where
 -- | A specification of a prometheus [histogram](https://prometheus.io/docs/concepts/metric_types/#histogram)
 class (EventMetric h) => EventHistogram h where
   -- | The upper bounds of the histogram buckets.
-  metricBounds :: h -> [UpperBound]
+  metricBounds :: h -> [P.UpperBound]
 
 -- | Render all events selectable by @s@ to prometheus metrics according to 'EventMetrics' @es@
 type RenderSelectorPrometheus s es = forall f. s f -> PrometheusRendered f es
@@ -117,6 +139,21 @@ data PrometheusRendered f es = PrometheusRendered
 
 -- | DSL for modifying metrics specified in 'EventMetrics' @es@
 data MetricModification es
+  = -- | Modify the specified counter
+    ModifyCounter CounterModification (Counter es)
+  | -- | Modify the specified gauge
+    ModifyGauge GaugeModification (Gauge es)
+  | -- | Modify the specified histogram
+    ModifyHistogram HistogramModification (Histogram es)
+
+-- | DSL for modifying a counter metric
+data CounterModification
+
+-- | DSL for modifying a gauge metric
+data GaugeModification
+
+-- | DSL for modifying a histogram metric
+data HistogramModification
 
 -- | What duration event is this?
 data EventDuration
@@ -129,3 +166,9 @@ data EventDuration
 --
 -- Prometheus can't make use of references, so this carries no information.
 data PrometheusReference = PrometheusReference
+
+-- | Exception thrown if we encounter an element of an 'EventMetric' that
+-- is not in @[minBound .. maxBound]@
+data NonExhaustiveMetricEnumeration = NonExhaustiveMetricEnumeration deriving (Show)
+
+instance Exception NonExhaustiveMetricEnumeration
