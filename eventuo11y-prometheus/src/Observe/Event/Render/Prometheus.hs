@@ -115,6 +115,9 @@ class (EventMetric h) => EventHistogram h where
   metricBounds :: h -> [PH.UpperBound]
 
 -- | Render all events selectable by @s@ to prometheus metrics according to 'EventMetrics' @es@
+--
+-- We may want to add functionality for easily combining 'RenderSelectorPrometheus's and 'EventMetrics'
+-- from nested selector types, possibly with additional labels layered on top.
 type RenderSelectorPrometheus s es = forall f. s f -> PrometheusRendered f es
 
 -- | How to render a specific 'Event' according to 'EventMetrics' @es@
