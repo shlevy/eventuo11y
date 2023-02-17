@@ -1,5 +1,6 @@
 {-# LANGUAGE EmptyCase #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -13,7 +14,10 @@
 -- Maintainer  : shea@shealevy.com
 module Observe.Event.Render.Prometheus where
 
+import Control.Exception
 import Control.Monad.IO.Class
+import Data.Foldable
+import Data.IORef
 import Data.Map
 import Data.Traversable
 import Observe.Event.Backend
@@ -35,17 +39,31 @@ prometheusEventBackend registry render = do
   _histograms <- fmap fromAscList . for [minBound @(Histogram es) ..] $ \hId -> do
     h <- liftIO $ registerHistogram (metricName hId) (metricLabels hId) (metricBounds hId) registry
     pure (hId, h)
+  let performModification :: MetricModification es -> m ()
+      performModification = \case {}
+      performModifications = traverse_ performModification
   pure $
     EventBackend
-      { newEvent = \(NewEventArgs {..}) -> case render newEventSelector of {},
-        emitImmediateEvent = \(NewEventArgs {..}) -> case render newEventSelector of {}
+      { newEvent = \(NewEventArgs {..}) -> do
+          let PrometheusRendered {..} = render newEventSelector
+          performModifications $ onStart newEventInitialFields Extended
+          fieldsRef <- liftIO $ newIORef []
+          pure $
+            Event
+              { reference = PrometheusReference,
+                addField = \f -> do
+                  performModifications $ onField f
+                  liftIO . atomicModifyIORef' fieldsRef $ \fields ->
+                    (f : fields, ()),
+                finalize = \e -> do
+                  fields <- liftIO $ readIORef fieldsRef
+                  performModifications $ onFinalize e (newEventInitialFields ++ (reverse fields))
+              },
+        emitImmediateEvent = \(NewEventArgs {..}) -> do
+          let PrometheusRendered {..} = render newEventSelector
+          traverse_ performModification $ onStart newEventInitialFields Immediate
+          pure PrometheusReference
       }
-
--- | Render all events selectable by @s@ to prometheus metrics according to 'EventMetrics' @es@
-type RenderSelectorPrometheus s es = forall f. s f -> PrometheusRendered f es
-
--- | How to render a specific 'Event' according to 'EventMetrics' @es@
-data PrometheusRendered f es
 
 -- | A specification of a collection of prometheus metrics.
 --
@@ -74,6 +92,38 @@ class (Ord a, Enum a, Bounded a) => EventMetric a where
 class (EventMetric h) => EventHistogram h where
   -- | The upper bounds of the histogram buckets.
   metricBounds :: h -> [UpperBound]
+
+-- | Render all events selectable by @s@ to prometheus metrics according to 'EventMetrics' @es@
+type RenderSelectorPrometheus s es = forall f. s f -> PrometheusRendered f es
+
+-- | How to render a specific 'Event' according to 'EventMetrics' @es@
+data PrometheusRendered f es = PrometheusRendered
+  { -- | Modify metrics at event start
+    --
+    -- Passed the 'newEventInitialFields'.
+    onStart :: !([f] -> EventDuration -> [MetricModification es]),
+    -- | Modify metrics when a field is added
+    --
+    -- Only called for events added with 'addField'
+    onField :: !(f -> [MetricModification es]),
+    -- | Modify metrics when an event finishes.
+    --
+    -- Passed all event fields (both initial fields and those added
+    -- during the event lifetime).
+    --
+    -- This is not called if the event is 'Immediate'.
+    onFinalize :: !(Maybe SomeException -> [f] -> [MetricModification es])
+  }
+
+-- | DSL for modifying metrics specified in 'EventMetrics' @es@
+data MetricModification es
+
+-- | What duration event is this?
+data EventDuration
+  = -- | A immediately finalized event
+    Immediate
+  | -- | An event with an extended lifetime
+    Extended
 
 -- | Reference type for 'prometheusEventBackend'
 --
