@@ -1,6 +1,4 @@
-{-# LANGUAGE EmptyCase #-}
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -22,9 +20,9 @@ import Data.Map
 import Data.Traversable
 import Observe.Event.Backend
 import System.Metrics.Prometheus.Concurrent.Registry
-import qualified System.Metrics.Prometheus.Metric.Counter as P
-import qualified System.Metrics.Prometheus.Metric.Gauge as P
-import qualified System.Metrics.Prometheus.Metric.Histogram as P
+import qualified System.Metrics.Prometheus.Metric.Counter as PC
+import qualified System.Metrics.Prometheus.Metric.Gauge as PG
+import qualified System.Metrics.Prometheus.Metric.Histogram as PH
 import System.Metrics.Prometheus.MetricId
 import Prelude hiding (lookup)
 
@@ -42,19 +40,20 @@ prometheusEventBackend registry render = do
   histograms <- fmap fromAscList . for [minBound @(Histogram es) ..] $ \hId -> do
     h <- liftIO $ registerHistogram (metricName hId) (metricLabels hId) (metricBounds hId) registry
     pure (hId, h)
-  let (!@) :: (Ord k) => Map k a -> k -> m a
-      m !@ k = case lookup k m of
+  let m !@ k = case lookup k m of
         Just a -> pure a
-        Nothing -> liftIO $ throwIO NonExhaustiveMetricEnumeration
+        Nothing -> throwIO NonExhaustiveMetricEnumeration
 
-      modifyCounter :: CounterModification -> P.Counter -> m ()
-      modifyCounter = \case {}
+      modifyCounter (AddCounter v) = PC.add v
+      modifyCounter IncCounter = PC.inc
 
-      modifyGauge :: GaugeModification -> P.Gauge -> m ()
-      modifyGauge = \case {}
+      modifyGauge (AddGauge v) = PG.add v
+      modifyGauge (Sub v) = PG.sub v
+      modifyGauge IncGauge = PG.inc
+      modifyGauge Dec = PG.dec
+      modifyGauge (Set v) = PG.set v
 
-      modifyHistogram :: HistogramModification -> P.Histogram -> m ()
-      modifyHistogram = \case {}
+      modifyHistogram (Observe v) = PH.observe v
 
       performModification (ModifyCounter modC cId) =
         counters !@ cId >>= modifyCounter modC
@@ -63,7 +62,7 @@ prometheusEventBackend registry render = do
       performModification (ModifyHistogram modH hId) =
         histograms !@ hId >>= modifyHistogram modH
 
-      performModifications = traverse_ performModification
+      performModifications = traverse_ $ liftIO . performModification
   pure $
     EventBackend
       { newEvent = \(NewEventArgs {..}) -> do
@@ -83,7 +82,7 @@ prometheusEventBackend registry render = do
               },
         emitImmediateEvent = \(NewEventArgs {..}) -> do
           let PrometheusRendered {..} = render newEventSelector
-          traverse_ performModification $ onStart newEventInitialFields Immediate
+          performModifications $ onStart newEventInitialFields Immediate
           pure PrometheusReference
       }
 
@@ -113,7 +112,7 @@ class (Ord a, Enum a, Bounded a) => EventMetric a where
 -- | A specification of a prometheus [histogram](https://prometheus.io/docs/concepts/metric_types/#histogram)
 class (EventMetric h) => EventHistogram h where
   -- | The upper bounds of the histogram buckets.
-  metricBounds :: h -> [P.UpperBound]
+  metricBounds :: h -> [PH.UpperBound]
 
 -- | Render all events selectable by @s@ to prometheus metrics according to 'EventMetrics' @es@
 type RenderSelectorPrometheus s es = forall f. s f -> PrometheusRendered f es
@@ -140,20 +139,36 @@ data PrometheusRendered f es = PrometheusRendered
 -- | DSL for modifying metrics specified in 'EventMetrics' @es@
 data MetricModification es
   = -- | Modify the specified counter
-    ModifyCounter CounterModification (Counter es)
+    ModifyCounter !CounterModification !(Counter es)
   | -- | Modify the specified gauge
-    ModifyGauge GaugeModification (Gauge es)
+    ModifyGauge !GaugeModification !(Gauge es)
   | -- | Modify the specified histogram
-    ModifyHistogram HistogramModification (Histogram es)
+    ModifyHistogram !HistogramModification !(Histogram es)
 
 -- | DSL for modifying a counter metric
 data CounterModification
+  = -- | Add a value to a counter
+    AddCounter !Int
+  | -- | Increment a counter
+    IncCounter
 
 -- | DSL for modifying a gauge metric
 data GaugeModification
+  = -- | Add a value to a gauge
+    AddGauge !Double
+  | -- | Subtract a value from a gauge
+    Sub !Double
+  | -- | Increment a gauge
+    IncGauge
+  | -- | Decrement a gauge
+    Dec
+  | -- | Set the value of a gauge
+    Set !Double
 
 -- | DSL for modifying a histogram metric
 data HistogramModification
+  = -- | Record an observation
+    Observe !Double
 
 -- | What duration event is this?
 data EventDuration
