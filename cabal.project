@@ -19,4 +19,7 @@ package eventuo11y-dsl
 package eventuo11y-json
   ghc-options: -Wall
 
+package eventuo11y-prometheus
+  ghc-options: -Wall
+
 extra-packages: temporary
