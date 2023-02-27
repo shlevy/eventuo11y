@@ -2,7 +2,7 @@
   pkgs = hackage:
     {
       packages = {
-        bytestring.revision = (((hackage.bytestring)."0.11.3.1").revisions).default;
+        bytestring.revision = (((hackage.bytestring)."0.11.4.0").revisions).default;
         safe-exceptions.revision = import ./cabal-files/safe-exceptions.nix;
         http-client.revision = import ./cabal-files/http-client.nix;
         http-client.flags.network-uri = true;
@@ -254,7 +254,7 @@
         attoparsec.flags.developer = false;
         array.revision = (((hackage.array)."0.5.4.0").revisions).default;
         basement.revision = import ./cabal-files/basement.nix;
-        ghc-boot-th.revision = (((hackage.ghc-boot-th)."9.2.5").revisions).default;
+        ghc-boot-th.revision = (((hackage.ghc-boot-th)."9.2.6").revisions).default;
         vector.revision = import ./cabal-files/vector.nix;
         vector.flags.internalchecks = false;
         vector.flags.wall = false;
@@ -281,8 +281,8 @@
         hashable.flags.integer-gmp = true;
         };
       compiler = {
-        version = "9.2.5";
-        nix-name = "ghc925";
+        version = "9.2.6";
+        nix-name = "ghc926";
         packages = {
           "pretty" = "1.1.3.6";
           "text" = "1.2.5.0";
@@ -290,11 +290,11 @@
           "Cabal" = "3.6.3.0";
           "mtl" = "2.2.2";
           "parsec" = "3.1.15.0";
-          "bytestring" = "0.11.3.1";
+          "bytestring" = "0.11.4.0";
           "filepath" = "1.4.2.2";
           "stm" = "2.5.0.2";
           "ghc-prim" = "0.8.0";
-          "ghc-boot-th" = "9.2.5";
+          "ghc-boot-th" = "9.2.6";
           "base" = "4.16.4.0";
           "time" = "1.11.1.1";
           "process" = "1.6.16.0";

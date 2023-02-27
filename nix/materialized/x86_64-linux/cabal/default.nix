@@ -3,7 +3,7 @@
     {
       packages = {
         Cabal-syntax.revision = import ./cabal-files/Cabal-syntax.nix;
-        bytestring.revision = (((hackage.bytestring)."0.11.3.1").revisions).default;
+        bytestring.revision = (((hackage.bytestring)."0.11.4.0").revisions).default;
         safe-exceptions.revision = import ./cabal-files/safe-exceptions.nix;
         echo.revision = import ./cabal-files/echo.nix;
         echo.flags.example = false;
@@ -76,7 +76,7 @@
         text.revision = (((hackage.text)."1.2.5.0").revisions).default;
         th-compat.revision = import ./cabal-files/th-compat.nix;
         array.revision = (((hackage.array)."0.5.4.0").revisions).default;
-        ghc-boot-th.revision = (((hackage.ghc-boot-th)."9.2.5").revisions).default;
+        ghc-boot-th.revision = (((hackage.ghc-boot-th)."9.2.6").revisions).default;
         resolv.revision = import ./cabal-files/resolv.nix;
         pretty.revision = (((hackage.pretty)."1.1.3.6").revisions).default;
         hashable.revision = import ./cabal-files/hashable.nix;
@@ -87,19 +87,19 @@
         cryptohash-sha256.flags.use-cbits = true;
         };
       compiler = {
-        version = "9.2.5";
-        nix-name = "ghc925";
+        version = "9.2.6";
+        nix-name = "ghc926";
         packages = {
           "pretty" = "1.1.3.6";
           "text" = "1.2.5.0";
           "array" = "0.5.4.0";
           "mtl" = "2.2.2";
           "parsec" = "3.1.15.0";
-          "bytestring" = "0.11.3.1";
+          "bytestring" = "0.11.4.0";
           "filepath" = "1.4.2.2";
           "stm" = "2.5.0.2";
           "ghc-prim" = "0.8.0";
-          "ghc-boot-th" = "9.2.5";
+          "ghc-boot-th" = "9.2.6";
           "base" = "4.16.4.0";
           "time" = "1.11.1.1";
           "process" = "1.6.16.0";

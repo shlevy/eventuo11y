@@ -155,8 +155,8 @@ compileFieldSpec (FieldSpec fieldNameBase fields) =
                             ( TupE
                                 [ Just . LitE $ StringL (show idx),
                                   Just $ AppE (VarE 'toJSON) (VarE argNm)
-                                ] :
-                              jsonEs,
+                                ]
+                                : jsonEs,
                               idx - 1
                             )
                         )

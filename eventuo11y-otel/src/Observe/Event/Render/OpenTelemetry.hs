@@ -15,7 +15,6 @@ import Observe.Event.Backend
 import OpenTelemetry.Context
 import OpenTelemetry.Context.ThreadLocal
 import OpenTelemetry.Trace.Core hiding (Event)
-import OpenTelemetry.Trace.Id
 
 -- | An 'EventBackend' built on a 'Tracer'.
 --
@@ -42,7 +41,7 @@ tracerEventBackend tracer render = backend
   where
     backend =
       EventBackend
-        { newEvent = \args@(NewEventArgs {..}) -> do
+        { newEvent = \(NewEventArgs {..}) -> do
             ctx <- maybe empty id <$> lookupContext
             let ctx' = case newEventParent of
                   Just s -> insertSpan s ctx

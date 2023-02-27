@@ -1,4 +1,4 @@
-index-state: 2023-02-11T00:00:00Z
+index-state: 2023-02-25T00:00:00Z
 packages:
   .
   eventuo11y-batteries
@@ -7,19 +7,9 @@ packages:
   eventuo11y-otel
   eventuo11y-prometheus
 
-package eventuo11y
-  ghc-options: -Wall
-
-package eventuo11y-batteries
-  ghc-options: -Wall
-
-package eventuo11y-dsl
-  ghc-options: -Wall
-
-package eventuo11y-json
-  ghc-options: -Wall
-
-package eventuo11y-prometheus
+program-options
   ghc-options: -Wall
 
 extra-packages: temporary
+
+allow-newer: general-allocate:primitive, aeson:primitive
