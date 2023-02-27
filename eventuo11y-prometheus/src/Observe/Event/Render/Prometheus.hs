@@ -13,7 +13,6 @@
 module Observe.Event.Render.Prometheus where
 
 import Control.Exception
-import Control.Monad.IO.Class
 import Data.Foldable
 import Data.IORef
 import Data.Map
@@ -29,16 +28,16 @@ import Prelude hiding (lookup)
 -- | An 'EventBackend' that populates a 'Registry'.
 --
 -- All metrics are registered before the backend is returned.
-prometheusEventBackend :: forall m es s. (MonadIO m, EventMetrics es) => Registry -> RenderSelectorPrometheus s es -> m (EventBackend m PrometheusReference s)
+prometheusEventBackend :: forall es s. (EventMetrics es) => Registry -> RenderSelectorPrometheus s es -> IO (EventBackend IO PrometheusReference s)
 prometheusEventBackend registry render = do
   counters <- fmap fromAscList . for [minBound @(Counter es) ..] $ \cId -> do
-    c <- liftIO $ registerCounter (metricName cId) (metricLabels cId) registry
+    c <- registerCounter (metricName cId) (metricLabels cId) registry
     pure (cId, c)
   gauges <- fmap fromAscList . for [minBound @(Gauge es) ..] $ \gId -> do
-    g <- liftIO $ registerGauge (metricName gId) (metricLabels gId) registry
+    g <- registerGauge (metricName gId) (metricLabels gId) registry
     pure (gId, g)
   histograms <- fmap fromAscList . for [minBound @(Histogram es) ..] $ \hId -> do
-    h <- liftIO $ registerHistogram (metricName hId) (metricLabels hId) (metricBounds hId) registry
+    h <- registerHistogram (metricName hId) (metricLabels hId) (metricBounds hId) registry
     pure (hId, h)
   let m !@ k = case lookup k m of
         Just a -> pure a
@@ -62,22 +61,22 @@ prometheusEventBackend registry render = do
       performModification (ModifyHistogram modH hId) =
         histograms !@ hId >>= modifyHistogram modH
 
-      performModifications = traverse_ $ liftIO . performModification
+      performModifications = traverse_ performModification
   pure $
     EventBackend
       { newEvent = \(NewEventArgs {..}) -> do
           let PrometheusRendered {..} = render newEventSelector
           performModifications $ onStart newEventInitialFields Extended
-          fieldsRef <- liftIO $ newIORef []
+          fieldsRef <- newIORef []
           pure $
             Event
               { reference = PrometheusReference,
                 addField = \f -> do
                   performModifications $ onField f
-                  liftIO . atomicModifyIORef' fieldsRef $ \fields ->
+                  atomicModifyIORef' fieldsRef $ \fields ->
                     (f : fields, ()),
                 finalize = \e -> do
-                  fields <- liftIO $ readIORef fieldsRef
+                  fields <- readIORef fieldsRef
                   performModifications $ onFinalize e (newEventInitialFields ++ (reverse fields))
               },
         emitImmediateEvent = \(NewEventArgs {..}) -> do
