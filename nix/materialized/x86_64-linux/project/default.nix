@@ -12,6 +12,7 @@
         dlist.flags.werror = false;
         exceptions.revision = (((hackage.exceptions)."0.10.4").revisions).default;
         directory.revision = (((hackage.directory)."1.3.6.2").revisions).default;
+        general-allocate.revision = import ./cabal-files/general-allocate.nix;
         http-api-data.revision = import ./cabal-files/http-api-data.nix;
         http-api-data.flags.use-text-show = false;
         vector-stream.revision = import ./cabal-files/vector-stream.nix;
@@ -283,7 +284,6 @@
   extras = hackage:
     {
       packages = {
-        general-allocate = ./.plan.nix/general-allocate.nix;
         eventuo11y = ./.plan.nix/eventuo11y.nix;
         eventuo11y-batteries = ./.plan.nix/eventuo11y-batteries.nix;
         eventuo11y-dsl = ./.plan.nix/eventuo11y-dsl.nix;
@@ -295,7 +295,6 @@
     ({ lib, ... }:
       {
         packages = {
-          "general-allocate" = { flags = {}; };
           "eventuo11y" = { flags = {}; };
           "eventuo11y-batteries" = { flags = {}; };
           "eventuo11y-dsl" = { flags = {}; };

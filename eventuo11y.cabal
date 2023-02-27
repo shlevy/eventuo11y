@@ -49,7 +49,7 @@ copyright:          Copyright 2022 Shea Levy.
 category:           Observability
 extra-source-files:
   CHANGELOG.md
-tested-with:        GHC == { 8.10.7, 9.2.4, 9.4.2 }
+tested-with:        GHC == { 8.10.7, 9.2.6, 9.4.2 }
 
 source-repository head
   type:     git
@@ -68,7 +68,7 @@ library
     , base              ^>= { 4.14, 4.16, 4.17 }
     , exceptions        ^>= { 0.10 }
     , general-allocate  ^>= { 0.2 } && >= 0.2.1
-    , primitive         ^>= { 0.7 }
+    , primitive         ^>= { 0.7, 0.8 }
     , time              ^>= { 1.11, 1.12 }
     , transformers      ^>= { 0.5, 0.6 }
     , transformers-base ^>= { 0.4 }
