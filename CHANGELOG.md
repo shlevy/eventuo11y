@@ -1,5 +1,9 @@
 # Revision history for eventuo11y
 
+## 0.9.0.1 -- 2023-03-01
+
+- Relax lower bound for `time`
+
 ## 0.9.0.0 -- 2023-01-17
 
 - Make `MonadWithEvent` require `MonadWithExceptable` for all `r` and `s`.
