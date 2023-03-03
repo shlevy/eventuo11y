@@ -11,7 +11,7 @@
     flags = {};
     package = {
       specVersion = "3.0";
-      identifier = { name = "eventuo11y-batteries"; version = "0.4.0.0"; };
+      identifier = { name = "eventuo11y-batteries"; version = "0.4.0.1"; };
       license = "Apache-2.0";
       copyright = "Copyright 2022 Shea Levy.";
       maintainer = "shea@shealevy.com";
@@ -58,7 +58,9 @@
           (hsPkgs."warp" or (errorHandler.buildDepError "warp"))
           ];
         buildable = true;
-        modules = [ "Observe/Event/Servant/Client" "Observe/Event/Wai" ];
+        modules = [
+          "Observe/Event/Wai"
+          ] ++ (pkgs.lib).optional (compiler.isGhc && (compiler.version).ge "9") "Observe/Event/Servant/Client";
         hsSourceDirs = [ "src" ];
         };
       };

@@ -1,6 +1,6 @@
 cabal-version:      3.0
 name:               eventuo11y-batteries
-version:            0.4.0.0
+version:            0.4.0.1
 synopsis:           Grab bag of eventuo11y-enriched functionality
 description:
   Miscellaneous helpers for instrumenting with [eventuo11y](https://hackage.haskell.org/package/eventuo11y) and 3rd-party packages.
@@ -21,8 +21,10 @@ source-repository head
 
 library
   exposed-modules:
-    Observe.Event.Servant.Client
     Observe.Event.Wai
+  if impl(ghc >= 9)
+    exposed-modules:
+      Observe.Event.Servant.Client
 
   build-depends:
     , base                 ^>= { 4.14, 4.16, 4.17 }

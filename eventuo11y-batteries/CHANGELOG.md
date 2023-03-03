@@ -1,5 +1,10 @@
 # Revision history for eventuo11y-batteries
 
+## 0.4.0.1 -- 2023-03-03
+
+- `ClientM` does not compile on 8.10 due to issues with `QuantifiedConstraints`, remove the module on old GHCs for now
+
+
 ## 0.4.0.0 -- 2023-01-17
 
 - Fix `ClientM` to be usable as an `EventMonadKind`
