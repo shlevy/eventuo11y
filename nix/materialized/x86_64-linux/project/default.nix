@@ -78,13 +78,14 @@
         integer-logarithms.flags.check-bounds = false;
         integer-logarithms.flags.integer-gmp = true;
         strict.revision = import ./cabal-files/strict.nix;
-        strict.flags.assoc = true;
         x509-system.revision = import ./cabal-files/x509-system.nix;
         base-compat.revision = import ./cabal-files/base-compat.nix;
         aeson.revision = import ./cabal-files/aeson.nix;
         aeson.flags.ordered-keymap = true;
         aeson.flags.cffi = false;
         recv.revision = import ./cabal-files/recv.nix;
+        foldable1-classes-compat.revision = import ./cabal-files/foldable1-classes-compat.nix;
+        foldable1-classes-compat.flags.tagged = true;
         utf8-string.revision = import ./cabal-files/utf8-string.nix;
         entropy.revision = import ./cabal-files/entropy.nix;
         entropy.flags.donotgetentropy = false;
@@ -92,6 +93,7 @@
         splitmix.revision = import ./cabal-files/splitmix.nix;
         splitmix.flags.optimised-mixer = false;
         assoc.revision = import ./cabal-files/assoc.nix;
+        assoc.flags.tagged = true;
         containers.revision = (((hackage.containers)."0.6.5.1").revisions).default;
         http-date.revision = import ./cabal-files/http-date.nix;
         clock.revision = import ./cabal-files/clock.nix;
@@ -123,7 +125,6 @@
         http2.revision = import ./cabal-files/http2.nix;
         http2.flags.devel = false;
         http2.flags.h2spec = false;
-        http2.flags.doc = false;
         resourcet.revision = import ./cabal-files/resourcet.nix;
         uuid-types.revision = import ./cabal-files/uuid-types.nix;
         bsb-http-chunked.revision = import ./cabal-files/bsb-http-chunked.nix;
@@ -212,7 +213,6 @@
         atomic-primops.flags.debug = false;
         indexed-traversable.revision = import ./cabal-files/indexed-traversable.nix;
         these.revision = import ./cabal-files/these.nix;
-        these.flags.assoc = true;
         psqueues.revision = import ./cabal-files/psqueues.nix;
         unordered-containers.revision = import ./cabal-files/unordered-containers.nix;
         unordered-containers.flags.debug = false;
@@ -237,7 +237,7 @@
         attoparsec.flags.developer = false;
         array.revision = (((hackage.array)."0.5.4.0").revisions).default;
         basement.revision = import ./cabal-files/basement.nix;
-        ghc-boot-th.revision = (((hackage.ghc-boot-th)."9.2.6").revisions).default;
+        ghc-boot-th.revision = (((hackage.ghc-boot-th)."9.2.7").revisions).default;
         charset.revision = import ./cabal-files/charset.nix;
         vector.revision = import ./cabal-files/vector.nix;
         vector.flags.internalchecks = false;
@@ -265,8 +265,8 @@
         hashable.flags.integer-gmp = true;
         };
       compiler = {
-        version = "9.2.6";
-        nix-name = "ghc926";
+        version = "9.2.7";
+        nix-name = "ghc927";
         packages = {
           "pretty" = "1.1.3.6";
           "text" = "1.2.5.0";
@@ -278,7 +278,7 @@
           "filepath" = "1.4.2.2";
           "stm" = "2.5.0.2";
           "ghc-prim" = "0.8.0";
-          "ghc-boot-th" = "9.2.6";
+          "ghc-boot-th" = "9.2.7";
           "base" = "4.16.4.0";
           "time" = "1.11.1.1";
           "process" = "1.6.16.0";
@@ -450,6 +450,7 @@
           "x509-validation".components.library.planned = lib.mkOverride 900 true;
           "singleton-bool".components.library.planned = lib.mkOverride 900 true;
           "attoparsec".components.library.planned = lib.mkOverride 900 true;
+          "foldable1-classes-compat".components.library.planned = lib.mkOverride 900 true;
           "mtl".components.library.planned = lib.mkOverride 900 true;
           "vault".components.library.planned = lib.mkOverride 900 true;
           "th-abstraction".components.library.planned = lib.mkOverride 900 true;

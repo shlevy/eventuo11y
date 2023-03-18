@@ -11,7 +11,7 @@
     flags = {};
     package = {
       specVersion = "1.18";
-      identifier = { name = "unix-time"; version = "0.4.8"; };
+      identifier = { name = "unix-time"; version = "0.4.9"; };
       license = "BSD-3-Clause";
       copyright = "";
       maintainer = "Kazu Yamamoto <kazu@iij.ad.jp>";
@@ -36,14 +36,6 @@
         buildable = true;
         };
       tests = {
-        "doctests" = {
-          depends = [
-            (hsPkgs."base" or (errorHandler.buildDepError "base"))
-            (hsPkgs."doctest" or (errorHandler.buildDepError "doctest"))
-            (hsPkgs."unix-time" or (errorHandler.buildDepError "unix-time"))
-            ];
-          buildable = false;
-          };
         "spec" = {
           depends = [
             (hsPkgs."base" or (errorHandler.buildDepError "base"))
@@ -64,9 +56,9 @@
       };
     } // {
     src = (pkgs.lib).mkDefault (pkgs.fetchurl {
-      url = "http://hackage.haskell.org/package/unix-time-0.4.8.tar.gz";
-      sha256 = "fedeb6a11bcb5396f50a30166a6bb05e56fc9866be4066718404bd8940ace843";
+      url = "http://hackage.haskell.org/package/unix-time-0.4.9.tar.gz";
+      sha256 = "490734d4860e065aa92fb3f54dc07ba5fa61b4a0c6fb9989f38d5713bcac8b08";
       });
     }) // {
-    package-description-override = "Name:                   unix-time\nVersion:                0.4.8\nAuthor:                 Kazu Yamamoto <kazu@iij.ad.jp>\nMaintainer:             Kazu Yamamoto <kazu@iij.ad.jp>\nLicense:                BSD3\nLicense-File:           LICENSE\nSynopsis:               Unix time parser/formatter and utilities\nDescription:            Fast parser\\/formatter\\/utilities for Unix time\nCategory:               Data\nCabal-Version:          1.18\nBuild-Type:             Configure\nExtra-Source-Files:     cbits/config.h.in\n                        cbits/conv.c\n                        cbits/strftime.c\n                        cbits/strptime.c\n                        cbits/win_patch.c\n                        cbits/win_patch.h\n                        configure\n                        configure.ac\nExtra-Tmp-Files:        config.log config.status autom4te.cache cbits/config.h\n\nLibrary\n  Default-Language:     Haskell2010\n  GHC-Options:          -Wall\n  if impl(ghc >= 7.8)\n    CC-Options:         -fPIC\n  Exposed-Modules:      Data.UnixTime\n  Other-Modules:        Data.UnixTime.Conv\n                        Data.UnixTime.Diff\n                        Data.UnixTime.Types\n                        Data.UnixTime.Sys\n  Build-Depends:        base >= 4 && < 5\n                      , bytestring\n                      , old-time\n                      , binary\n  Build-Tools:          hsc2hs\n  C-Sources:            cbits/conv.c\n  if os(windows)\n    C-Sources:          cbits/strftime.c\n                      , cbits/strptime.c\n                      , cbits/win_patch.c\n  include-dirs:         cbits\n\nTest-Suite doctests\n  Buildable:            False\n  Type:                 exitcode-stdio-1.0\n  Default-Language:     Haskell2010\n  HS-Source-Dirs:       test\n  Ghc-Options:          -threaded -Wall\n  Main-Is:              doctests.hs\n  Build-Depends:        base\n                      , doctest >= 0.9.3\n                      , unix-time\n\nTest-Suite spec\n  Type:                 exitcode-stdio-1.0\n  Default-Language:     Haskell2010\n  Hs-Source-Dirs:       test\n  Ghc-Options:          -Wall\n  Main-Is:              Spec.hs\n  Other-Modules:        UnixTimeSpec\n  Build-Tools:          hspec-discover >= 2.6\n  Build-Depends:        base\n                      , bytestring\n                      , old-locale\n                      , old-time\n                      , QuickCheck\n                      , time\n                      , unix-time\n                      , hspec >= 2.6\n\nSource-Repository head\n  Type:                 git\n  Location:             https://github.com/kazu-yamamoto/unix-time\n";
+    package-description-override = "cabal-version:      1.18\nname:               unix-time\nversion:            0.4.9\nlicense:            BSD3\nlicense-file:       LICENSE\nmaintainer:         Kazu Yamamoto <kazu@iij.ad.jp>\nauthor:             Kazu Yamamoto <kazu@iij.ad.jp>\nsynopsis:           Unix time parser/formatter and utilities\ndescription:        Fast parser\\/formatter\\/utilities for Unix time\ncategory:           Data\nbuild-type:         Configure\nextra-source-files:\n    cbits/config.h.in\n    cbits/conv.c\n    cbits/strftime.c\n    cbits/strptime.c\n    cbits/win_patch.c\n    cbits/win_patch.h\n    configure\n    configure.ac\n\nextra-tmp-files:\n    config.log\n    config.status\n    autom4te.cache\n    cbits/config.h\n\nsource-repository head\n    type:     git\n    location: https://github.com/kazu-yamamoto/unix-time\n\nlibrary\n    exposed-modules:  Data.UnixTime\n    build-tools:      hsc2hs >=0\n    c-sources:        cbits/conv.c\n    other-modules:\n        Data.UnixTime.Conv\n        Data.UnixTime.Diff\n        Data.UnixTime.Types\n        Data.UnixTime.Sys\n\n    default-language: Haskell2010\n    include-dirs:     cbits\n    ghc-options:      -Wall\n    build-depends:\n        base >=4 && <5,\n        bytestring,\n        old-time,\n        binary\n\n    if impl(ghc >=7.8)\n        cc-options: -fPIC\n\n    if os(windows)\n        c-sources:\n            cbits/strftime.c\n            cbits/strptime.c\n            cbits/win_patch.c\n\ntest-suite spec\n    type:             exitcode-stdio-1.0\n    main-is:          Spec.hs\n    build-tools:      hspec-discover >=2.6\n    hs-source-dirs:   test\n    other-modules:    UnixTimeSpec\n    default-language: Haskell2010\n    ghc-options:      -Wall\n    build-depends:\n        base,\n        bytestring,\n        old-locale,\n        old-time,\n        QuickCheck,\n        time,\n        unix-time,\n        hspec >=2.6\n";
     }

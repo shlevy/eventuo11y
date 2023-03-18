@@ -59,7 +59,7 @@
               project = pkgs.haskell-nix.cabalProject' {
                 inherit evalSystem;
                 src = ./.;
-                compiler-nix-name = "ghc926";
+                compiler-nix-name = "ghc927";
                 shell.tools = tools;
                 shell.nativeBuildInputs = extraShellPackages pkgs;
                 shell.additional = hpkgs: [hpkgs.temporary];
