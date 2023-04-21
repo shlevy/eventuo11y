@@ -100,6 +100,10 @@ data OTelRendered f = OTelRendered
     eventName :: !Text,
     -- | See the specification on [SpanKind](https://opentelemetry.io/docs/reference/specification/trace/api/#spankind)
     eventKind :: !SpanKind,
+    -- | Span [attributes](https://opentelemetry.io/docs/reference/specification/common/#attribute) associated with the event.
+    --
+    -- Note especially the [attribute naming guidelines](https://opentelemetry.io/docs/reference/specification/common/attribute-naming/)
+    eventAttributes :: ![(Text, Attribute)],
     -- | Render a field to a set of span [attributes](https://opentelemetry.io/docs/reference/specification/common/#attribute).
     --
     -- Note especially the [attribute naming guidelines](https://opentelemetry.io/docs/reference/specification/common/attribute-naming/)

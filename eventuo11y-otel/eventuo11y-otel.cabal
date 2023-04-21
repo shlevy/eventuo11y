@@ -1,6 +1,6 @@
 cabal-version:      3.0
 name:               eventuo11y-otel
-version:            0.1.0.2
+version:            0.2.0.0
 synopsis:           OpenTelemetry-based rendering for eventuo11y
 description:
   Render [eventuo11y](https://hackage.haskell.org/package/eventuo11y) 'Observe.Event.Event's
