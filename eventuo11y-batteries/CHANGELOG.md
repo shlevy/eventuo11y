@@ -1,5 +1,9 @@
 # Revision history for eventuo11y-batteries
 
+## 0.4.0.2 -- 2024-01-25
+
+- Bump `aeson` upper bound
+
 ## 0.4.0.1 -- 2023-03-03
 
 - `ClientM` does not compile on 8.10 due to issues with `QuantifiedConstraints`, remove the module on old GHCs for now
